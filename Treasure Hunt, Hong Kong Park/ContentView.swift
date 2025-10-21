@@ -1040,15 +1040,16 @@ struct ContentView: View {
     @State private var isRouting: Bool = false
     @State private var showClue: Bool = false
     @State private var showNavigation: Bool = false
-    @State private var showOvalOffice: Bool = false
-    @State private var ovalOfficeScale: CGFloat = 1.0
-    @State private var ovalOfficeOffset: CGSize = .zero
-    @State private var ovalOfficeLastMagnification: CGFloat = 1.0
-    @State private var ovalOfficeDragStartOffset: CGSize = .zero
-    @State private var isRegisteringAsset: Bool = false
-    @State private var showAssetInfoModal: Bool = false
-    @State private var selectedAssetInfo: AssetInfo? = nil
-    @State private var isNewAsset: Bool = false
+    // Office Map状态已移到OvalOfficeViewModel
+    // @State private var showOvalOffice: Bool = false
+    // @State private var ovalOfficeVM.ovalOfficeScale: CGFloat = 1.0
+    // @State private var ovalOfficeVM.ovalOfficeOffset: CGSize = .zero
+    // @State private var ovalOfficeVM.ovalOfficeLastMagnification: CGFloat = 1.0
+    // @State private var ovalOfficeVM.ovalOfficeDragStartOffset: CGSize = .zero
+    // @State private var ovalOfficeVM.isRegisteringAsset: Bool = false
+    // @State private var ovalOfficeVM.showAssetInfoModal: Bool = false
+    // @State private var ovalOfficeVM.selectedAssetInfo: AssetInfo? = nil
+    // @State private var ovalOfficeVM.isNewAsset: Bool = false
     @State private var showUserDetailModal: Bool = false
     @State private var selectedUserInteraction: UserInteraction? = nil
     @State private var currentInteractionIndex: Int = 0  // 当前查看的历史记录索引
@@ -1057,18 +1058,20 @@ struct ContentView: View {
     
     // 模拟用户互动数据（已废弃，现在使用Asset的userInteractions数组）
     // private let mockUserInteractions: [UserInteraction] = []
-    @State private var officeAssets: [AssetInfo] = []
-    @State private var showAssetInputModal: Bool = false
-    @State private var selectedAssetIndex: Int? = nil
-    @State private var assetName: String = ""
-    @State private var assetImage: UIImage? = nil
-    @State private var assetDescription: String = ""
+    // Asset相关状态已移到OvalOfficeViewModel
+    // @State private var ovalOfficeVM.officeAssets: [AssetInfo] = []
+    // @State private var ovalOfficeVM.showAssetInputModal: Bool = false
+    // @State private var ovalOfficeVM.selectedAssetIndex: Int? = nil
+    // @State private var ovalOfficeVM.assetName: String = ""
+    // @State private var ovalOfficeVM.assetImage: UIImage? = nil
+    // @State private var ovalOfficeVM.assetDescription: String = ""
     @State private var clueText: String = ""
     @State private var clueImageURL: URL? = nil
     @State private var showFullScreenImage: Bool = false
     @StateObject private var locationManager = LocationManager()
     @StateObject private var nfcManager = NFCManager()
     @StateObject private var persistenceManager = PersistenceManager.shared
+    @StateObject private var ovalOfficeVM = OvalOfficeViewModel()
     private let hkParkLatRange: ClosedRange<Double> = 22.2755...22.2792
     private let hkParkLonRange: ClosedRange<Double> = 114.1587...114.1620
     
@@ -1170,8 +1173,8 @@ struct ContentView: View {
             Logger.info("Removed \(removedCount) assets without GPS coordinates")
         }
         
-        officeAssets = validAssets
-        Logger.database("Loaded \(officeAssets.count) assets (with GPS coordinates)")
+        ovalOfficeVM.officeAssets = validAssets
+        Logger.database("Loaded \(ovalOfficeVM.officeAssets.count) assets (with GPS coordinates)")
         
         // 如果有assets被删除，保存更新后的列表
         if removedCount > 0 {
@@ -1181,8 +1184,8 @@ struct ContentView: View {
     
     /// 保存所有Asset到磁盘
     private func saveAssetsToDisk() {
-        let coordinates = officeAssets.map { $0.coordinate }
-        persistenceManager.saveAssets(officeAssets, coordinates: coordinates)
+        let coordinates = ovalOfficeVM.officeAssets.map { $0.coordinate }
+        persistenceManager.saveAssets(ovalOfficeVM.officeAssets, coordinates: coordinates)
     }
     
     /// 快速保存单个Asset
@@ -1238,24 +1241,24 @@ struct ContentView: View {
         let gridSize: CGFloat = 5.0 // 5像素的网格
         
         // 计算图片在当前视图中的实际显示尺寸
-        let scaledImageWidth = imageSize.width * ovalOfficeScale
-        let scaledImageHeight = imageSize.height * ovalOfficeScale
+        let scaledImageWidth = imageSize.width * ovalOfficeVM.ovalOfficeScale
+        let scaledImageHeight = imageSize.height * ovalOfficeVM.ovalOfficeScale
         
         // 计算图片在视图中的偏移量（居中显示）
         let offsetX = (viewSize.width - scaledImageWidth) / 2
         let offsetY = (viewSize.height - scaledImageHeight) / 2
         
         // 计算相对于图片的坐标
-        let relativeX = screenPoint.x - offsetX - ovalOfficeOffset.width
-        let relativeY = screenPoint.y - offsetY - ovalOfficeOffset.height
+        let relativeX = screenPoint.x - offsetX - ovalOfficeVM.ovalOfficeOffset.width
+        let relativeY = screenPoint.y - offsetY - ovalOfficeVM.ovalOfficeOffset.height
         
         // 检查是否在图片范围内
         if relativeX >= 0 && relativeX <= scaledImageWidth &&
            relativeY >= 0 && relativeY <= scaledImageHeight {
             
             // 转换为原始图片坐标
-            let originalX = relativeX / ovalOfficeScale
-            let originalY = relativeY / ovalOfficeScale
+            let originalX = relativeX / ovalOfficeVM.ovalOfficeScale
+            let originalY = relativeY / ovalOfficeVM.ovalOfficeScale
             
             // 检查点击位置是否在PNG图片的非透明像素上
             let imagePoint = CGPoint(x: originalX, y: originalY)
@@ -1280,8 +1283,8 @@ struct ContentView: View {
         let gridSize: CGFloat = 5.0 // 5像素的网格
         
         // 计算图片在当前视图中的实际显示尺寸
-        let scaledImageWidth = imageSize.width * ovalOfficeScale
-        let scaledImageHeight = imageSize.height * ovalOfficeScale
+        let scaledImageWidth = imageSize.width * ovalOfficeVM.ovalOfficeScale
+        let scaledImageHeight = imageSize.height * ovalOfficeVM.ovalOfficeScale
         
         // 计算图片在视图中的偏移量（居中显示）
         let offsetX = (viewSize.width - scaledImageWidth) / 2
@@ -1292,8 +1295,8 @@ struct ContentView: View {
         let originalY = CGFloat(gridCoord.y) * gridSize + gridSize / 2
         
         // 转换为屏幕坐标
-        let screenX = originalX * ovalOfficeScale + offsetX + ovalOfficeOffset.width
-        let screenY = originalY * ovalOfficeScale + offsetY + ovalOfficeOffset.height
+        let screenX = originalX * ovalOfficeVM.ovalOfficeScale + offsetX + ovalOfficeVM.ovalOfficeOffset.width
+        let screenY = originalY * ovalOfficeVM.ovalOfficeScale + offsetY + ovalOfficeVM.ovalOfficeOffset.height
         
         return CGPoint(x: screenX, y: screenY)
     }
@@ -1546,8 +1549,8 @@ struct ContentView: View {
             await MainActor.run {
                 userSession.saveSession(user: user)
                 isAuthenticating = false
-                showLogin = false
-                showTerms = true
+                                showLogin = false
+                                showTerms = true
             }
             
         } catch {
@@ -1629,7 +1632,7 @@ struct ContentView: View {
         // 如果已经加载过，直接进入地图
         if hasPreloadedMap {
             Logger.info("Map data already loaded, entering map view")
-            showWelcome = false
+        showWelcome = false
             checkLocationPermissionAndExecute {
                 showMap = true
             }
@@ -1695,7 +1698,7 @@ struct ContentView: View {
     private var networkBanner: some View {
         VStack {
             if !networkMonitor.isConnected {
-                HStack {
+            HStack {
                     Image(systemName: "wifi.slash")
                         .foregroundColor(.white)
                     Text("No network connection")
@@ -1709,8 +1712,8 @@ struct ContentView: View {
                 .padding(.top, 50)
                 .transition(.move(edge: .top).combined(with: .opacity))
             }
-            Spacer()
-        }
+                Spacer()
+            }
         .animation(.easeInOut, value: networkMonitor.isConnected)
     }
     
@@ -1765,7 +1768,7 @@ struct ContentView: View {
     
     // 全屏地图视图
     private var fullScreenMapView: some View {
-        // 全屏地图区域
+                // 全屏地图区域
             ZStack(alignment: .topLeading) {
                 Map(position: $cameraPosition) {
                     // 用户位置 - 绿色圆点
@@ -1802,7 +1805,7 @@ struct ContentView: View {
                                         // 检查是否是Oval Office（建筑ID为900）
                                         if building.id == "900" {
                                             // 先打开Oval Office，再关闭地图（避免看到中间页面）
-                                            showOvalOffice = true
+                                            ovalOfficeVM.showOvalOffice = true
                                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                                                 showMap = false
                                             }
@@ -2744,10 +2747,10 @@ struct ContentView: View {
                                     nfcManager.didDetectNFC = true
                                     
                                     // 设置输入框的默认值
-                                    assetName = building.name
-                                    assetImage = nil
-                                    assetDescription = ""
-                                    isNewAsset = false
+                                    ovalOfficeVM.assetName = building.name
+                                    ovalOfficeVM.assetImage = nil
+                                    ovalOfficeVM.assetDescription = ""
+                                    ovalOfficeVM.isNewAsset = false
                                     
                                     // 设置NFC回调处理Check-in完成
                                     nfcManager.onNFCDetected = {
@@ -2787,9 +2790,9 @@ struct ContentView: View {
                     // Check-in输入模态框覆盖层
                     if showCheckInInputModal {
                         CheckInInputModal(
-                            assetName: $assetName,
-                            assetImage: $assetImage,
-                            assetDescription: $assetDescription,
+                            ovalOfficeVM.assetName: $ovalOfficeVM.assetName,
+                            ovalOfficeVM.assetImage: $ovalOfficeVM.assetImage,
+                            ovalOfficeVM.assetDescription: $ovalOfficeVM.assetDescription,
                             appGreen: appGreen,
                             nfcManager: nfcManager,
                             onCancel: {
@@ -2819,10 +2822,10 @@ struct ContentView: View {
                 case .assetHistory, .nfcMismatchAlert:
                     // 这些现在直接在导航界面内部显示，不需要fullScreenCover
                     EmptyView()
-                }
-            }
         }
-    
+    }
+}
+
     // MARK: - Helper Methods
     private func zoom(by factor: Double) {
         // 缩放 span，并限制在合理范围内
@@ -3113,16 +3116,16 @@ struct ContentView: View {
         let checkInRecord = CheckInRecord(
             username: displayUsername,
             timestamp: Date(),
-            assetName: assetName,
-            description: assetDescription,
-            image: assetImage
+            ovalOfficeVM.assetName: ovalOfficeVM.assetName,
+            description: ovalOfficeVM.assetDescription,
+            image: ovalOfficeVM.assetImage
         )
         
         // 这里可以保存到本地存储或发送到服务器
         // 目前先打印日志确认数据
         Logger.debug("Check-in Record:")
         Logger.debug("   - Username: \(checkInRecord.username)")
-        Logger.debug("   - Asset: \(checkInRecord.assetName)")
+        Logger.debug("   - Asset: \(checkInRecord.ovalOfficeVM.assetName)")
         Logger.debug("   - Description: \(checkInRecord.description)")
         Logger.debug("   - Has Image: \(checkInRecord.image != nil)")
         Logger.debug("   - Timestamp: \(checkInRecord.timestamp)")
@@ -3634,12 +3637,12 @@ struct ContentView: View {
                 Image("OvalOfficePlan")
                     .resizable()
                     .aspectRatio(contentMode: .fit)
-                    .scaleEffect(ovalOfficeScale)
-                    .offset(ovalOfficeOffset)
+                    .scaleEffect(ovalOfficeVM.ovalOfficeScale)
+                    .offset(ovalOfficeVM.ovalOfficeOffset)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .overlay(
                         // 网格覆盖层
-                        GridOverlayView(scale: ovalOfficeScale, offset: ovalOfficeOffset)
+                        GridOverlayView(scale: ovalOfficeVM.ovalOfficeScale, offset: ovalOfficeVM.ovalOfficeOffset)
                     )
             }
             
@@ -3654,28 +3657,28 @@ struct ContentView: View {
                             DragGesture(minimumDistance: 20)
                                 .onChanged { value in
                                     // 只有在非注册模式下才允许拖拽
-                                    if !isRegisteringAsset {
-                                        ovalOfficeOffset = CGSize(
-                                            width: ovalOfficeDragStartOffset.width + value.translation.width,
-                                            height: ovalOfficeDragStartOffset.height + value.translation.height
+                                    if !ovalOfficeVM.isRegisteringAsset {
+                                        ovalOfficeVM.ovalOfficeOffset = CGSize(
+                                            width: ovalOfficeVM.ovalOfficeDragStartOffset.width + value.translation.width,
+                                            height: ovalOfficeVM.ovalOfficeDragStartOffset.height + value.translation.height
                                         )
                                     }
                                 }
                                 .onEnded { value in
                                     // 保存拖拽结束时的偏移量
-                                    ovalOfficeDragStartOffset = ovalOfficeOffset
+                                    ovalOfficeVM.ovalOfficeDragStartOffset = ovalOfficeVM.ovalOfficeOffset
                                 }
                         )
                         .onTapGesture(count: 2) {
                             withAnimation(.easeInOut(duration: 0.3)) {
-                                ovalOfficeScale = ovalOfficeScale == 1.0 ? 2.0 : 1.0
-                                ovalOfficeOffset = .zero
-                                ovalOfficeDragStartOffset = .zero
+                                ovalOfficeVM.ovalOfficeScale = ovalOfficeVM.ovalOfficeScale == 1.0 ? 2.0 : 1.0
+                                ovalOfficeVM.ovalOfficeOffset = .zero
+                                ovalOfficeVM.ovalOfficeDragStartOffset = .zero
                             }
                         }
                     
                     // 注册模式下的点击处理层
-                    if isRegisteringAsset {
+                    if ovalOfficeVM.isRegisteringAsset {
                         Color.clear
                             .contentShape(Rectangle())
                             .gesture(
@@ -3705,19 +3708,19 @@ struct ContentView: View {
                                                 locationManager.requestLocation()
                                             }
                                             
-                                            officeAssets.append(newAsset)
+                                            ovalOfficeVM.officeAssets.append(newAsset)
                                             Logger.success("Asset registered at grid coordinate: (\(gridCoord.x), \(gridCoord.y)) with NFC UUID: \(nfcManager.assetUUID)")
                                             
                                             // 设置新添加的资产为选中状态，准备输入信息
-                                            selectedAssetIndex = officeAssets.count - 1
-                                            assetName = ""
-                                            assetImage = nil
-                                            assetDescription = ""
-                                            isNewAsset = true
+                                            ovalOfficeVM.selectedAssetIndex = ovalOfficeVM.officeAssets.count - 1
+                                            ovalOfficeVM.assetName = ""
+                                            ovalOfficeVM.assetImage = nil
+                                            ovalOfficeVM.assetDescription = ""
+                                            ovalOfficeVM.isNewAsset = true
                                             
                                             // 退出注册模式并显示输入框
-                                            isRegisteringAsset = false
-                                            showAssetInputModal = true
+                                            ovalOfficeVM.isRegisteringAsset = false
+                                            ovalOfficeVM.showAssetInputModal = true
                                         } else {
                                             // 点击位置不在PNG图片范围内，忽略注册动作
                                             Logger.debug("Click outside image bounds - asset registration ignored")
@@ -3727,7 +3730,7 @@ struct ContentView: View {
                     }
                     
                     // 显示资产标记 - 使用更大的点击区域和简单的手势
-                    ForEach(Array(officeAssets.enumerated()), id: \.offset) { index, asset in
+                    ForEach(Array(ovalOfficeVM.officeAssets.enumerated()), id: \.offset) { index, asset in
                         let screenPoint = gridToScreenCoordinate(asset.coordinate, viewSize: geometry.size)
                         
                         VStack(spacing: 2) {
@@ -3755,16 +3758,16 @@ struct ContentView: View {
                         .onTapGesture {
                             if asset.name.isEmpty {
                                 // 如果资产未注册，显示输入框
-                                selectedAssetIndex = index
-                                assetName = asset.name
-                                assetImage = asset.image
-                                assetDescription = asset.description
-                                isNewAsset = false
-                                showAssetInputModal = true
+                                ovalOfficeVM.selectedAssetIndex = index
+                                ovalOfficeVM.assetName = asset.name
+                                ovalOfficeVM.assetImage = asset.image
+                                ovalOfficeVM.assetDescription = asset.description
+                                ovalOfficeVM.isNewAsset = false
+                                ovalOfficeVM.showAssetInputModal = true
                             } else {
                                 // 如果资产已注册，显示用户互动记录
-                                selectedAssetInfo = asset
-                                showAssetInfoModal = true
+                                ovalOfficeVM.selectedAssetInfo = asset
+                                ovalOfficeVM.showAssetInfoModal = true
                             }
                         }
                         .position(screenPoint)
@@ -3774,7 +3777,7 @@ struct ContentView: View {
             
             // 左上角返回按钮 - 返回到Hong Kong地图
             Button(action: {
-                showOvalOffice = false
+                ovalOfficeVM.showOvalOffice = false
                 showMap = true
             }) {
                 Image(systemName: "chevron.left")
@@ -3792,7 +3795,7 @@ struct ContentView: View {
             VStack(spacing: 10) {
                 Button(action: {
                     withAnimation(.easeInOut(duration: 0.3)) {
-                        ovalOfficeScale = min(ovalOfficeScale * 1.5, 4.0)
+                        ovalOfficeVM.ovalOfficeScale = min(ovalOfficeVM.ovalOfficeScale * 1.5, 4.0)
                     }
                 }) {
                     ZStack {
@@ -3807,7 +3810,7 @@ struct ContentView: View {
                 
                 Button(action: {
                     withAnimation(.easeInOut(duration: 0.3)) {
-                        ovalOfficeScale = max(ovalOfficeScale / 1.5, 0.5)
+                        ovalOfficeVM.ovalOfficeScale = max(ovalOfficeVM.ovalOfficeScale / 1.5, 0.5)
                     }
                 }) {
                     ZStack {
@@ -3877,32 +3880,32 @@ struct ContentView: View {
                 .padding(.bottom, 20)
             }
         }
-        .sheet(isPresented: $showAssetInputModal) {
+        .sheet(isPresented: $ovalOfficeVM.showAssetInputModal) {
             AssetInputModal(
-                assetName: $assetName,
-                assetImage: $assetImage,
-                assetDescription: $assetDescription,
+                ovalOfficeVM.assetName: $ovalOfficeVM.assetName,
+                ovalOfficeVM.assetImage: $ovalOfficeVM.assetImage,
+                ovalOfficeVM.assetDescription: $ovalOfficeVM.assetDescription,
                 appGreen: appGreen,
                 nfcManager: nfcManager,
                 onCancel: {
                     // 根据资产是否为新注册来决定关闭行为
-                    if isNewAsset {
+                    if ovalOfficeVM.isNewAsset {
                         // 如果是新注册的资产，删除它
-                        if let index = selectedAssetIndex {
-                            officeAssets.remove(at: index)
+                        if let index = ovalOfficeVM.selectedAssetIndex {
+                            ovalOfficeVM.officeAssets.remove(at: index)
                         }
                     }
                     // 如果是已存在的资产，保持原有信息不变
-                    showAssetInputModal = false
+                    ovalOfficeVM.showAssetInputModal = false
                     // 重置NFC管理器和注册状态
                     nfcManager.reset()
-                    isRegisteringAsset = false
+                    ovalOfficeVM.isRegisteringAsset = false
                 }
             )
         }
         .overlay(
             // 资产信息框
-            showAssetInfoModal ? assetInfoModal : nil
+            ovalOfficeVM.showAssetInfoModal ? assetInfoModal : nil
         )
         .overlay(
             // 用户详细信息框
@@ -3923,103 +3926,103 @@ struct ContentView: View {
                     switch self.nfcManager.currentPhase {
                     case .awaitingInput:
                         // 第一次NFC扫描完成，启用地图点击注册模式
-                        self.isRegisteringAsset = true
+                        self.ovalOfficeVM.isRegisteringAsset = true
                     case .completed:
                         // 第二次NFC扫描完成，保存资产信息
-                        if let index = self.selectedAssetIndex {
+                        if let index = self.ovalOfficeVM.selectedAssetIndex {
                             // 更新Asset信息
-                            self.officeAssets[index].name = self.assetName
-                            self.officeAssets[index].image = self.assetImage
-                            self.officeAssets[index].description = self.assetDescription
+                            self.ovalOfficeVM.officeAssets[index].name = self.ovalOfficeVM.assetName
+                            self.ovalOfficeVM.officeAssets[index].image = self.ovalOfficeVM.assetImage
+                            self.ovalOfficeVM.officeAssets[index].description = self.ovalOfficeVM.assetDescription
                             
                             // 创建初始历史记录（注册时的信息）
                             let displayUsername = self.username.isEmpty ? "Guest" : self.username
                             let initialInteraction = UserInteraction(
                                 username: displayUsername,
                                 interactionTime: Date(),
-                                image: self.assetImage,
-                                assetName: self.assetName,
-                                description: self.assetDescription
+                                image: self.ovalOfficeVM.assetImage,
+                                ovalOfficeVM.assetName: self.ovalOfficeVM.assetName,
+                                description: self.ovalOfficeVM.assetDescription
                             )
-                            self.officeAssets[index].userInteractions.append(initialInteraction)
+                            self.ovalOfficeVM.officeAssets[index].userInteractions.append(initialInteraction)
                             
                             // 保存到磁盘
-                            self.quickSaveAsset(self.officeAssets[index])
+                            self.quickSaveAsset(self.ovalOfficeVM.officeAssets[index])
                             
                             Logger.success("Asset saved with initial history")
                         }
                         // 关闭输入框
-                        self.showAssetInputModal = false
+                        self.ovalOfficeVM.showAssetInputModal = false
                         // 重置NFC管理器和注册状态
                         self.nfcManager.reset()
-                        self.isRegisteringAsset = false
+                        self.ovalOfficeVM.isRegisteringAsset = false
                     case .checkInInput:
                         // Check-in第一次NFC验证成功，显示输入框让用户添加描述
                         Logger.success("Check-in first NFC verified, showing input modal")
                         
                         // 预填充当前Asset的名称（允许用户修改）
-                        if let index = self.selectedAssetIndex {
-                            self.assetName = self.officeAssets[index].name
-                            Logger.debug("Pre-filled Asset name: \(self.assetName)")
+                        if let index = self.ovalOfficeVM.selectedAssetIndex {
+                            self.ovalOfficeVM.assetName = self.ovalOfficeVM.officeAssets[index].name
+                            Logger.debug("Pre-filled Asset name: \(self.ovalOfficeVM.assetName)")
                         }
                         
                         // 清空照片和描述（用于新的check-in记录）
-                        self.assetImage = nil
-                        self.assetDescription = ""
-                        self.isNewAsset = false
+                        self.ovalOfficeVM.assetImage = nil
+                        self.ovalOfficeVM.assetDescription = ""
+                        self.ovalOfficeVM.isNewAsset = false
                         
                         // 显示输入框
-                        self.showAssetInputModal = true
+                        self.ovalOfficeVM.showAssetInputModal = true
                     case .checkInCompleted:
                         // Check-in第二次NFC验证成功，保存check-in数据
                         Logger.success("Check-in second NFC verified, saving data...")
                         
                         // 保存check-in数据并更新Asset信息
-                        if let index = self.selectedAssetIndex {
+                        if let index = self.ovalOfficeVM.selectedAssetIndex {
                             Logger.database("Check-in for Asset at index \(index)")
                             
                             // 保存当前的Asset名称（用于历史记录）
-                            let currentAssetName = self.assetName
+                            let currentAssetName = self.ovalOfficeVM.assetName
                             let displayUsername = self.username.isEmpty ? "Guest" : self.username
                             
                             // 如果用户输入了新的Asset名称，更新地图上的Asset名称
-                            if !self.assetName.isEmpty {
-                                self.officeAssets[index].name = self.assetName
-                                Logger.success("Asset name updated to: \(self.assetName)")
+                            if !self.ovalOfficeVM.assetName.isEmpty {
+                                self.ovalOfficeVM.officeAssets[index].name = self.ovalOfficeVM.assetName
+                                Logger.success("Asset name updated to: \(self.ovalOfficeVM.assetName)")
                             }
                             
                             // 创建check-in历史记录
                             let newInteraction = UserInteraction(
                                 username: displayUsername,
                                 interactionTime: Date(),
-                                image: self.assetImage,
-                                assetName: currentAssetName,
-                                description: self.assetDescription
+                                image: self.ovalOfficeVM.assetImage,
+                                ovalOfficeVM.assetName: currentAssetName,
+                                description: self.ovalOfficeVM.assetDescription
                             )
-                            self.officeAssets[index].userInteractions.append(newInteraction)
+                            self.ovalOfficeVM.officeAssets[index].userInteractions.append(newInteraction)
                             
                             // 更新GPS坐标（每次check-in时更新当前位置）
                             if let location = self.locationManager.location {
-                                self.officeAssets[index].latitude = location.coordinate.latitude
-                                self.officeAssets[index].longitude = location.coordinate.longitude
+                                self.ovalOfficeVM.officeAssets[index].latitude = location.coordinate.latitude
+                                self.ovalOfficeVM.officeAssets[index].longitude = location.coordinate.longitude
                                 Logger.location("GPS坐标已更新: \(location.coordinate.latitude), \(location.coordinate.longitude)")
                             } else {
                                 Logger.warning("Unable to get current GPS location")
                             }
                             
                             // 保存到磁盘
-                            self.quickSaveAsset(self.officeAssets[index])
+                            self.quickSaveAsset(self.ovalOfficeVM.officeAssets[index])
                             
                             Logger.success("Check-in saved to disk")
                             Logger.debug("   - Username: \(displayUsername)")
                             Logger.debug("   - Asset Name: \(currentAssetName)")
-                            Logger.debug("   - Description: \(self.assetDescription)")
-                            Logger.debug("   - Has Image: \(self.assetImage != nil)")
-                            Logger.debug("   - Total interactions: \(self.officeAssets[index].userInteractions.count)")
+                            Logger.debug("   - Description: \(self.ovalOfficeVM.assetDescription)")
+                            Logger.debug("   - Has Image: \(self.ovalOfficeVM.assetImage != nil)")
+                            Logger.debug("   - Total interactions: \(self.ovalOfficeVM.officeAssets[index].userInteractions.count)")
                         }
                         
                         // 关闭输入框
-                        self.showAssetInputModal = false
+                        self.ovalOfficeVM.showAssetInputModal = false
                         // 重置NFC管理器
                         self.nfcManager.reset()
                         
@@ -4037,15 +4040,15 @@ struct ContentView: View {
                     self.alreadyRegisteredNFCUUID = self.nfcManager.assetUUID
                     
                     // 查找该NFC对应的Asset
-                    if let existingAsset = self.officeAssets.first(where: { $0.nfcUUID == self.nfcManager.assetUUID }) {
-                        self.selectedAssetInfo = existingAsset
+                    if let existingAsset = self.ovalOfficeVM.officeAssets.first(where: { $0.nfcUUID == self.nfcManager.assetUUID }) {
+                        self.ovalOfficeVM.selectedAssetInfo = existingAsset
                     }
                     
                     // 显示提示弹窗
                     self.showNFCAlreadyRegisteredAlert = true
                     
                     // 重置注册状态
-                    self.isRegisteringAsset = false
+                    self.ovalOfficeVM.isRegisteringAsset = false
                 }
             }
         }
@@ -4054,7 +4057,7 @@ struct ContentView: View {
             nfcManager.reset()
             nfcManager.onNFCDetected = nil
             nfcManager.onNFCAlreadyRegistered = nil
-            isRegisteringAsset = false
+            ovalOfficeVM.isRegisteringAsset = false
         }
     }
     
@@ -4065,7 +4068,7 @@ struct ContentView: View {
             Color.black.opacity(0.4)
                 .ignoresSafeArea()
                 .onTapGesture {
-                    showAssetInfoModal = false
+                    ovalOfficeVM.showAssetInfoModal = false
                 }
             
             // 信息框
@@ -4081,7 +4084,7 @@ struct ContentView: View {
                     
                     // 关闭按钮
                     Button(action: {
-                        showAssetInfoModal = false
+                        ovalOfficeVM.showAssetInfoModal = false
                     }) {
                         Image(systemName: "xmark")
                             .font(.title3)
@@ -4093,28 +4096,28 @@ struct ContentView: View {
                 .padding(.bottom, 16)
                 
                 // Asset基本信息（包含Asset名称和GPS坐标）
-                if let asset = selectedAssetInfo,
-                   let index = officeAssets.firstIndex(where: { $0.coordinate.x == asset.coordinate.x && $0.coordinate.y == asset.coordinate.y }) {
+                if let asset = ovalOfficeVM.selectedAssetInfo,
+                   let index = ovalOfficeVM.officeAssets.firstIndex(where: { $0.coordinate.x == asset.coordinate.x && $0.coordinate.y == asset.coordinate.y }) {
                     VStack(alignment: .leading, spacing: 8) {
                         // Asset名称
-                        if !officeAssets[index].name.isEmpty {
+                        if !ovalOfficeVM.officeAssets[index].name.isEmpty {
                             HStack(spacing: 6) {
                                 Image(systemName: "tag.fill")
                                     .font(.caption)
                                     .foregroundColor(.blue)
-                                Text(officeAssets[index].name)
+                                Text(ovalOfficeVM.officeAssets[index].name)
                                     .font(.subheadline)
                                     .fontWeight(.semibold)
                             }
                         }
                         
                         // GPS坐标
-                        if officeAssets[index].hasGPSCoordinates {
+                        if ovalOfficeVM.officeAssets[index].hasGPSCoordinates {
                             HStack(spacing: 6) {
                                 Image(systemName: "location.fill")
                                     .font(.caption)
                                     .foregroundColor(.green)
-                                Text("GPS: \(officeAssets[index].gpsCoordinatesString)")
+                                Text("GPS: \(ovalOfficeVM.officeAssets[index].gpsCoordinatesString)")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }
@@ -4149,9 +4152,9 @@ struct ContentView: View {
                 ScrollView {
                     LazyVStack(spacing: 12) {
                         // 显示真实的历史记录
-                        if let asset = selectedAssetInfo,
-                           let index = officeAssets.firstIndex(where: { $0.coordinate.x == asset.coordinate.x && $0.coordinate.y == asset.coordinate.y }) {
-                            let interactions = officeAssets[index].userInteractions
+                        if let asset = ovalOfficeVM.selectedAssetInfo,
+                           let index = ovalOfficeVM.officeAssets.firstIndex(where: { $0.coordinate.x == asset.coordinate.x && $0.coordinate.y == asset.coordinate.y }) {
+                            let interactions = ovalOfficeVM.officeAssets[index].userInteractions
                             
                             if interactions.isEmpty {
                                 // 如果没有历史记录，显示提示
@@ -4191,26 +4194,26 @@ struct ContentView: View {
                 // Check in mine! 按钮
                 Button(action: {
                     // 关闭历史信息框
-                    showAssetInfoModal = false
+                    ovalOfficeVM.showAssetInfoModal = false
                     
                     // 设置当前资产为选中状态
-                    if let asset = selectedAssetInfo {
+                    if let asset = ovalOfficeVM.selectedAssetInfo {
                         // 找到资产在数组中的索引
-                        if let index = officeAssets.firstIndex(where: { $0.coordinate.x == asset.coordinate.x && $0.coordinate.y == asset.coordinate.y }) {
-                            selectedAssetIndex = index
+                        if let index = ovalOfficeVM.officeAssets.firstIndex(where: { $0.coordinate.x == asset.coordinate.x && $0.coordinate.y == asset.coordinate.y }) {
+                            ovalOfficeVM.selectedAssetIndex = index
                             
                             // 检查Asset是否有NFC UUID
-                            let assetNFCUUID = officeAssets[index].nfcUUID
+                            let assetNFCUUID = ovalOfficeVM.officeAssets[index].nfcUUID
                             
                             if assetNFCUUID.isEmpty {
                                 Logger.warning("Asset has no NFC UUID, cannot check in")
                                 // 可以显示一个提示，或者允许无NFC check-in
                                 // 这里直接显示输入框（向后兼容没有NFC的Asset）
-                                assetName = ""
-                                assetImage = nil
-                                assetDescription = ""
-                                isNewAsset = false
-                                showAssetInputModal = true
+                                ovalOfficeVM.assetName = ""
+                                ovalOfficeVM.assetImage = nil
+                                ovalOfficeVM.assetDescription = ""
+                                ovalOfficeVM.isNewAsset = false
+                                ovalOfficeVM.showAssetInputModal = true
                             } else {
                                 Logger.debug("Starting NFC check-in first scan for Asset with UUID: \(assetNFCUUID)")
                                 // 启动第一次NFC扫描验证
@@ -4290,8 +4293,8 @@ struct ContentView: View {
                 }
                 
                 // Asset名称（粗体显示）
-                if !interaction.assetName.isEmpty {
-                    Text(interaction.assetName)
+                if !interaction.ovalOfficeVM.assetName.isEmpty {
+                    Text(interaction.ovalOfficeVM.assetName)
                         .font(.body)
                         .fontWeight(.bold)
                         .foregroundColor(.primary)
@@ -4356,9 +4359,9 @@ struct ContentView: View {
                     }
                     
                     // 导航按钮 - 在当前Asset的历史记录中前后翻页
-                    if let asset = selectedAssetInfo,
-                       let assetIndex = officeAssets.firstIndex(where: { $0.coordinate.x == asset.coordinate.x && $0.coordinate.y == asset.coordinate.y }) {
-                        let interactions = officeAssets[assetIndex].userInteractions.reversed()
+                    if let asset = ovalOfficeVM.selectedAssetInfo,
+                       let assetIndex = ovalOfficeVM.officeAssets.firstIndex(where: { $0.coordinate.x == asset.coordinate.x && $0.coordinate.y == asset.coordinate.y }) {
+                        let interactions = ovalOfficeVM.officeAssets[assetIndex].userInteractions.reversed()
                         let totalCount = interactions.count
                         
                         if totalCount > 1 {
@@ -4442,14 +4445,14 @@ struct ContentView: View {
                             }
                             
                             // Asset名称
-                            if !interaction.assetName.isEmpty {
+                            if !interaction.ovalOfficeVM.assetName.isEmpty {
                                 VStack(alignment: .leading, spacing: 8) {
                                     Text("Asset Name")
                                         .font(.subheadline)
                                         .fontWeight(.semibold)
                                         .foregroundColor(.secondary)
                                     
-                                    Text(interaction.assetName)
+                                    Text(interaction.ovalOfficeVM.assetName)
                                         .font(.title3)
                                         .fontWeight(.bold)
                                         .foregroundColor(appGreen)
@@ -4554,9 +4557,9 @@ struct ContentView: View {
                         showNFCAlreadyRegisteredAlert = false
                         
                         // 查找该NFC对应的Asset
-                        if let asset = officeAssets.first(where: { $0.nfcUUID == alreadyRegisteredNFCUUID }) {
-                            selectedAssetInfo = asset
-                            showAssetInfoModal = true
+                        if let asset = ovalOfficeVM.officeAssets.first(where: { $0.nfcUUID == alreadyRegisteredNFCUUID }) {
+                            ovalOfficeVM.selectedAssetInfo = asset
+                            ovalOfficeVM.showAssetInfoModal = true
                         } else {
                             Logger.warning("未找到对应的Asset")
                         }
@@ -4590,7 +4593,7 @@ struct ContentView: View {
                     Button(action: {
                         showNFCAlreadyRegisteredAlert = false
                         nfcManager.reset()
-                        isRegisteringAsset = false
+                        ovalOfficeVM.isRegisteringAsset = false
                     }) {
                         Text("Cancel")
                             .font(.body)
@@ -4615,20 +4618,20 @@ struct ContentView: View {
     // MARK: - Body
     var body: some View {
         contentWithModifiers
-            .fullScreenCover(isPresented: $showOvalOffice) {
+            .fullScreenCover(isPresented: $ovalOfficeVM.showOvalOffice) {
                 ovalOfficeView
             }
             .fullScreenCover(isPresented: $showMap) {
                 fullScreenMapView
-            }
+        }
     }
 }
 
 // Asset信息输入弹窗组件
 struct AssetInputModal: View {
-    @Binding var assetName: String
-    @Binding var assetImage: UIImage?
-    @Binding var assetDescription: String
+    @Binding var ovalOfficeVM.assetName: String
+    @Binding var ovalOfficeVM.assetImage: UIImage?
+    @Binding var ovalOfficeVM.assetDescription: String
     let appGreen: Color
     @ObservedObject var nfcManager: NFCManager
     let onCancel: () -> Void
@@ -4663,12 +4666,12 @@ struct AssetInputModal: View {
                                 .font(.headline)
                                 .foregroundColor(.primary)
                             
-                            TextField("max 8 characters", text: $assetName)
+                            TextField("max 8 characters", text: $ovalOfficeVM.assetName)
                                 .textFieldStyle(RoundedBorderTextFieldStyle())
                                 .font(.body)
-                                .onChange(of: assetName) { _, newValue in
+                                .onChange(of: ovalOfficeVM.assetName) { _, newValue in
                                     if newValue.count > 8 {
-                                        assetName = String(newValue.prefix(8))
+                                        ovalOfficeVM.assetName = String(newValue.prefix(8))
                                     }
                                 }
                         }
@@ -4683,7 +4686,7 @@ struct AssetInputModal: View {
                             Button(action: {
                                 showingPhotoOptions = true
                             }) {
-                                if let image = assetImage {
+                                if let image = ovalOfficeVM.assetImage {
                                     Image(uiImage: image)
                                         .resizable()
                                         .aspectRatio(contentMode: .fill)
@@ -4717,7 +4720,7 @@ struct AssetInputModal: View {
                                 .font(.headline)
                                 .foregroundColor(.primary)
                             
-                            TextField("Enter description", text: $assetDescription, axis: .vertical)
+                            TextField("Enter description", text: $ovalOfficeVM.assetDescription, axis: .vertical)
                                 .textFieldStyle(RoundedBorderTextFieldStyle())
                                 .font(.body)
                                 .lineLimit(6...12)
@@ -4780,10 +4783,10 @@ struct AssetInputModal: View {
             }
         }
         .sheet(isPresented: $showingImagePicker) {
-            ImagePicker(image: $assetImage, sourceType: sourceType)
+            ImagePicker(image: $ovalOfficeVM.assetImage, sourceType: sourceType)
         }
         .sheet(isPresented: $showingCamera) {
-            ImagePicker(image: $assetImage, sourceType: sourceType)
+            ImagePicker(image: $ovalOfficeVM.assetImage, sourceType: sourceType)
         }
         .actionSheet(isPresented: $showingPhotoOptions) {
             ActionSheet(
@@ -4812,7 +4815,7 @@ struct AssetInputModal: View {
         }
         .onAppear {
             // 初始化显示标题
-            displayTitle = assetName.isEmpty ? "Asset Information" : assetName
+            displayTitle = ovalOfficeVM.assetName.isEmpty ? "Asset Information" : ovalOfficeVM.assetName
         }
     }
 }
@@ -5428,9 +5431,9 @@ struct AssetHistoryContentView: View {
 
 // Check-in输入模态框 - 覆盖层版本
 struct CheckInInputModal: View {
-    @Binding var assetName: String
-    @Binding var assetImage: UIImage?
-    @Binding var assetDescription: String
+    @Binding var ovalOfficeVM.assetName: String
+    @Binding var ovalOfficeVM.assetImage: UIImage?
+    @Binding var ovalOfficeVM.assetDescription: String
     let appGreen: Color
     @ObservedObject var nfcManager: NFCManager
     let onCancel: () -> Void
@@ -5446,9 +5449,9 @@ struct CheckInInputModal: View {
             
             // 输入模态框
             AssetInputModal(
-                assetName: $assetName,
-                assetImage: $assetImage,
-                assetDescription: $assetDescription,
+                ovalOfficeVM.assetName: $ovalOfficeVM.assetName,
+                ovalOfficeVM.assetImage: $ovalOfficeVM.assetImage,
+                ovalOfficeVM.assetDescription: $ovalOfficeVM.assetDescription,
                 appGreen: appGreen,
                 nfcManager: nfcManager,
                 onCancel: onCancel
