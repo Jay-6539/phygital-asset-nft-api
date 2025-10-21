@@ -4629,9 +4629,9 @@ struct ContentView: View {
 
 // Asset信息输入弹窗组件
 struct AssetInputModal: View {
-    @Binding var ovalOfficeVM.assetName: String
-    @Binding var ovalOfficeVM.assetImage: UIImage?
-    @Binding var ovalOfficeVM.assetDescription: String
+    @Binding var assetName: String
+    @Binding var assetImage: UIImage?
+    @Binding var assetDescription: String
     let appGreen: Color
     @ObservedObject var nfcManager: NFCManager
     let onCancel: () -> Void
@@ -5431,9 +5431,9 @@ struct AssetHistoryContentView: View {
 
 // Check-in输入模态框 - 覆盖层版本
 struct CheckInInputModal: View {
-    @Binding var ovalOfficeVM.assetName: String
-    @Binding var ovalOfficeVM.assetImage: UIImage?
-    @Binding var ovalOfficeVM.assetDescription: String
+    @Binding var assetName: String
+    @Binding var assetImage: UIImage?
+    @Binding var assetDescription: String
     let appGreen: Color
     @ObservedObject var nfcManager: NFCManager
     let onCancel: () -> Void
