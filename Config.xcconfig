@@ -1,0 +1,16 @@
+// Configuration Variables for Treasure Hunt, Hong Kong Park
+// 配置变量 - 敏感信息统一管理
+
+// Supabase Configuration
+SUPABASE_URL = https:/$()/zcaznpjulvmaxjnhvqaw.supabase.co
+SUPABASE_ANON_KEY = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpjYXpucGp1bHZtYXhqbmh2cWF3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAzMzI2MjEsImV4cCI6MjA3NTkwODYyMX0.W6NzDWwkrq5tBDA929XXY6AOGgg6DVxM0GcRDq5WTL4
+
+// Historic Buildings Supabase Configuration
+HISTORIC_BUILDINGS_URL = https:/$()/spplmgbpsavuibjtszkl.supabase.co
+HISTORIC_BUILDINGS_KEY = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNwcGxtZ2Jwc2F2dWlianRzemtsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAzNDk0NDQsImV4cCI6MjA3NTkyNTQ0NH0._KVA9tLaeHkNj1ZN2_FRAgMkpozpndHVxKr4P5EO95M
+
+// Note: 在生产环境中，应该：
+// 1. 将此文件添加到 .gitignore
+// 2. 提供一个 Config.xcconfig.example 模板
+// 3. 团队成员各自创建自己的 Config.xcconfig
+

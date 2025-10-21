@@ -1,0 +1,16 @@
+// Configuration Variables Template
+// 复制此文件为 Config.xcconfig 并填入你的真实配置
+
+// Supabase Configuration
+SUPABASE_URL = https:/$()/YOUR_PROJECT_ID.supabase.co
+SUPABASE_ANON_KEY = YOUR_SUPABASE_ANON_KEY_HERE
+
+// Historic Buildings Supabase Configuration  
+HISTORIC_BUILDINGS_URL = https:/$()/YOUR_BUILDINGS_PROJECT_ID.supabase.co
+HISTORIC_BUILDINGS_KEY = YOUR_BUILDINGS_ANON_KEY_HERE
+
+// 使用说明:
+// 1. 复制此文件: cp Config.xcconfig.example Config.xcconfig
+// 2. 填入真实的API密钥
+// 3. Config.xcconfig 已在 .gitignore 中，不会被提交到版本控制
+

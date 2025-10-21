@@ -1,0 +1,23 @@
+# Xcode
+*.xcuserstate
+*.xcuserdatad/
+xcuserdata/
+DerivedData/
+.DS_Store
+
+# CocoaPods
+Pods/
+
+# Build
+build/
+*.ipa
+*.dSYM.zip
+
+# Swift Package Manager
+.swiftpm/
+
+# Temporary files
+*.swp
+*.swo
+*~
+.cursor/

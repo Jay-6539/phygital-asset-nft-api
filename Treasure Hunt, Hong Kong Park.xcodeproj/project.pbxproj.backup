@@ -1,0 +1,665 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXContainerItemProxy section */
+		6984FBA92E54506D002B545F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 6984FB922E54506C002B545F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 6984FB992E54506C002B545F;
+			remoteInfo = "Treasure Hunt, Hong Kong Park";
+		};
+		6984FBB32E54506D002B545F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 6984FB922E54506C002B545F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 6984FB992E54506C002B545F;
+			remoteInfo = "Treasure Hunt, Hong Kong Park";
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		6984FB9A2E54506C002B545F /* Treasure Hunt, Hong Kong Park.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Treasure Hunt, Hong Kong Park.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		6984FBA82E54506D002B545F /* Treasure Hunt, Hong Kong ParkTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Treasure Hunt, Hong Kong ParkTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		6984FBB22E54506D002B545F /* Treasure Hunt, Hong Kong ParkUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Treasure Hunt, Hong Kong ParkUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		6984FB9C2E54506C002B545F /* Treasure Hunt, Hong Kong Park */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "Treasure Hunt, Hong Kong Park";
+			sourceTree = "<group>";
+		};
+		6984FBAB2E54506D002B545F /* Treasure Hunt, Hong Kong ParkTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "Treasure Hunt, Hong Kong ParkTests";
+			sourceTree = "<group>";
+		};
+		6984FBB52E54506D002B545F /* Treasure Hunt, Hong Kong ParkUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "Treasure Hunt, Hong Kong ParkUITests";
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		6984FB972E54506C002B545F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		6984FBA52E54506D002B545F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		6984FBAF2E54506D002B545F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		6984FB912E54506C002B545F = {
+			isa = PBXGroup;
+			children = (
+				6984FB9C2E54506C002B545F /* Treasure Hunt, Hong Kong Park */,
+				6984FBAB2E54506D002B545F /* Treasure Hunt, Hong Kong ParkTests */,
+				6984FBB52E54506D002B545F /* Treasure Hunt, Hong Kong ParkUITests */,
+				6984FB9B2E54506C002B545F /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		6984FB9B2E54506C002B545F /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				6984FB9A2E54506C002B545F /* Treasure Hunt, Hong Kong Park.app */,
+				6984FBA82E54506D002B545F /* Treasure Hunt, Hong Kong ParkTests.xctest */,
+				6984FBB22E54506D002B545F /* Treasure Hunt, Hong Kong ParkUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		6984FB992E54506C002B545F /* Treasure Hunt, Hong Kong Park */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 6984FBBC2E54506D002B545F /* Build configuration list for PBXNativeTarget "Treasure Hunt, Hong Kong Park" */;
+			buildPhases = (
+				6984FB962E54506C002B545F /* Sources */,
+				6984FB972E54506C002B545F /* Frameworks */,
+				6984FB982E54506C002B545F /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				6984FB9C2E54506C002B545F /* Treasure Hunt, Hong Kong Park */,
+			);
+			name = "Treasure Hunt, Hong Kong Park";
+			packageProductDependencies = (
+				69BC2CB02EA0EB46009A34E2 /* GoogleSignIn */,
+				69BC2CB22EA0EB46009A34E2 /* GoogleSignInSwift */,
+				69BC2CB82EA0EB69009A34E2 /* FacebookCore */,
+				69BC2CBC2EA0EB69009A34E2 /* FacebookLogin */,
+			);
+			productName = "Treasure Hunt, Hong Kong Park";
+			productReference = 6984FB9A2E54506C002B545F /* Treasure Hunt, Hong Kong Park.app */;
+			productType = "com.apple.product-type.application";
+		};
+		6984FBA72E54506D002B545F /* Treasure Hunt, Hong Kong ParkTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 6984FBBF2E54506D002B545F /* Build configuration list for PBXNativeTarget "Treasure Hunt, Hong Kong ParkTests" */;
+			buildPhases = (
+				6984FBA42E54506D002B545F /* Sources */,
+				6984FBA52E54506D002B545F /* Frameworks */,
+				6984FBA62E54506D002B545F /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				6984FBAA2E54506D002B545F /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				6984FBAB2E54506D002B545F /* Treasure Hunt, Hong Kong ParkTests */,
+			);
+			name = "Treasure Hunt, Hong Kong ParkTests";
+			productName = "Treasure Hunt, Hong Kong ParkTests";
+			productReference = 6984FBA82E54506D002B545F /* Treasure Hunt, Hong Kong ParkTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		6984FBB12E54506D002B545F /* Treasure Hunt, Hong Kong ParkUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 6984FBC22E54506D002B545F /* Build configuration list for PBXNativeTarget "Treasure Hunt, Hong Kong ParkUITests" */;
+			buildPhases = (
+				6984FBAE2E54506D002B545F /* Sources */,
+				6984FBAF2E54506D002B545F /* Frameworks */,
+				6984FBB02E54506D002B545F /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				6984FBB42E54506D002B545F /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				6984FBB52E54506D002B545F /* Treasure Hunt, Hong Kong ParkUITests */,
+			);
+			name = "Treasure Hunt, Hong Kong ParkUITests";
+			productName = "Treasure Hunt, Hong Kong ParkUITests";
+			productReference = 6984FBB22E54506D002B545F /* Treasure Hunt, Hong Kong ParkUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		6984FB922E54506C002B545F /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1640;
+				LastUpgradeCheck = 1640;
+				TargetAttributes = {
+					6984FB992E54506C002B545F = {
+						CreatedOnToolsVersion = 16.4;
+					};
+					6984FBA72E54506D002B545F = {
+						CreatedOnToolsVersion = 16.4;
+						TestTargetID = 6984FB992E54506C002B545F;
+					};
+					6984FBB12E54506D002B545F = {
+						CreatedOnToolsVersion = 16.4;
+						TestTargetID = 6984FB992E54506C002B545F;
+					};
+				};
+			};
+			buildConfigurationList = 6984FB952E54506C002B545F /* Build configuration list for PBXProject "Treasure Hunt, Hong Kong Park" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 6984FB912E54506C002B545F;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				69BC2CA02EA0CFFF009A34E2 /* XCRemoteSwiftPackageReference "swift-algorithms" */,
+				69BC2CA12EA0D071009A34E2 /* XCRemoteSwiftPackageReference "facebook-ios-sdk" */,
+				69BC2CA22EA0D0B3009A34E2 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 6984FB9B2E54506C002B545F /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				6984FB992E54506C002B545F /* Treasure Hunt, Hong Kong Park */,
+				6984FBA72E54506D002B545F /* Treasure Hunt, Hong Kong ParkTests */,
+				6984FBB12E54506D002B545F /* Treasure Hunt, Hong Kong ParkUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		6984FB982E54506C002B545F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		6984FBA62E54506D002B545F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		6984FBB02E54506D002B545F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		6984FB962E54506C002B545F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		6984FBA42E54506D002B545F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		6984FBAE2E54506D002B545F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		6984FBAA2E54506D002B545F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 6984FB992E54506C002B545F /* Treasure Hunt, Hong Kong Park */;
+			targetProxy = 6984FBA92E54506D002B545F /* PBXContainerItemProxy */;
+		};
+		6984FBB42E54506D002B545F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 6984FB992E54506C002B545F /* Treasure Hunt, Hong Kong Park */;
+			targetProxy = 6984FBB32E54506D002B545F /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		6984FBBA2E54506D002B545F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		6984FBBB2E54506D002B545F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		6984FBBD2E54506D002B545F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "Treasure Hunt, Hong Kong Park/Treasure_Hunt__Hong_Kong_Park.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = HGD6WW3P7T;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Treasure-Hunt--Hong-Kong-Park-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Treasure Hunt";
+				INFOPLIST_KEY_NFCReaderUsageDescription = "Tap and Register the Asset";
+				INFOPLIST_KEY_NSCameraUsageDescription = "This app needs access to your camera to take photos for asset registration and treasure hunting activities.";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "This app needs location access to show your current position on the treasure hunt map.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "This app needs location access to show your current position on the treasure hunt map.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "This app needs access to your photo library to upload images for asset registration and treasure hunting activities.";
+				INFOPLIST_KEY_NSUserTrackingUsageDescription = "This app uses tracking to provide personalized content and improve your experience. Your data helps us deliver relevant features and content.";
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 15.5;
+				MARKETING_VERSION = 1.0;
+				"PRODUCT_BUNDLE_IDENTIFIER[sdk=*]" = com.jay.treasurehunt;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				XROS_DEPLOYMENT_TARGET = 2.5;
+			};
+			name = Debug;
+		};
+		6984FBBE2E54506D002B545F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "Treasure Hunt, Hong Kong Park/Treasure_Hunt__Hong_Kong_Park.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = HGD6WW3P7T;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Treasure-Hunt--Hong-Kong-Park-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Treasure Hunt";
+				INFOPLIST_KEY_NFCReaderUsageDescription = "Tap and Register the Asset";
+				INFOPLIST_KEY_NSCameraUsageDescription = "This app needs access to your camera to take photos for asset registration and treasure hunting activities.";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "This app needs location access to show your current position on the treasure hunt map.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "This app needs location access to show your current position on the treasure hunt map.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "This app needs access to your photo library to upload images for asset registration and treasure hunting activities.";
+				INFOPLIST_KEY_NSUserTrackingUsageDescription = "This app uses tracking to provide personalized content and improve your experience. Your data helps us deliver relevant features and content.";
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 15.5;
+				MARKETING_VERSION = 1.0;
+				"PRODUCT_BUNDLE_IDENTIFIER[sdk=*]" = com.jay.treasurehunt;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				XROS_DEPLOYMENT_TARGET = 2.5;
+			};
+			name = Release;
+		};
+		6984FBC02E54506D002B545F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = HGD6WW3P7T;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				MACOSX_DEPLOYMENT_TARGET = 15.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "Oval-Partnerhsip-Limited.Treasure-Hunt--Hong-Kong-ParkTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Treasure Hunt, Hong Kong Park.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Treasure Hunt, Hong Kong Park";
+				XROS_DEPLOYMENT_TARGET = 2.5;
+			};
+			name = Debug;
+		};
+		6984FBC12E54506D002B545F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = HGD6WW3P7T;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				MACOSX_DEPLOYMENT_TARGET = 15.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "Oval-Partnerhsip-Limited.Treasure-Hunt--Hong-Kong-ParkTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Treasure Hunt, Hong Kong Park.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Treasure Hunt, Hong Kong Park";
+				XROS_DEPLOYMENT_TARGET = 2.5;
+			};
+			name = Release;
+		};
+		6984FBC32E54506D002B545F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = HGD6WW3P7T;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				MACOSX_DEPLOYMENT_TARGET = 15.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "Oval-Partnerhsip-Limited.Treasure-Hunt--Hong-Kong-ParkUITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_TARGET_NAME = "Treasure Hunt, Hong Kong Park";
+				XROS_DEPLOYMENT_TARGET = 2.5;
+			};
+			name = Debug;
+		};
+		6984FBC42E54506D002B545F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = HGD6WW3P7T;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				MACOSX_DEPLOYMENT_TARGET = 15.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "Oval-Partnerhsip-Limited.Treasure-Hunt--Hong-Kong-ParkUITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_TARGET_NAME = "Treasure Hunt, Hong Kong Park";
+				XROS_DEPLOYMENT_TARGET = 2.5;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		6984FB952E54506C002B545F /* Build configuration list for PBXProject "Treasure Hunt, Hong Kong Park" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6984FBBA2E54506D002B545F /* Debug */,
+				6984FBBB2E54506D002B545F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		6984FBBC2E54506D002B545F /* Build configuration list for PBXNativeTarget "Treasure Hunt, Hong Kong Park" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6984FBBD2E54506D002B545F /* Debug */,
+				6984FBBE2E54506D002B545F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		6984FBBF2E54506D002B545F /* Build configuration list for PBXNativeTarget "Treasure Hunt, Hong Kong ParkTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6984FBC02E54506D002B545F /* Debug */,
+				6984FBC12E54506D002B545F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		6984FBC22E54506D002B545F /* Build configuration list for PBXNativeTarget "Treasure Hunt, Hong Kong ParkUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6984FBC32E54506D002B545F /* Debug */,
+				6984FBC42E54506D002B545F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		69BC2CA02EA0CFFF009A34E2 /* XCRemoteSwiftPackageReference "swift-algorithms" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-algorithms.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.2.1;
+			};
+		};
+		69BC2CA12EA0D071009A34E2 /* XCRemoteSwiftPackageReference "facebook-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/facebook/facebook-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 14.1.0;
+			};
+		};
+		69BC2CA22EA0D0B3009A34E2 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google/GoogleSignIn-iOS";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 9.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		69BC2CB02EA0EB46009A34E2 /* GoogleSignIn */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 69BC2CA22EA0D0B3009A34E2 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignIn;
+		};
+		69BC2CB22EA0EB46009A34E2 /* GoogleSignInSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 69BC2CA22EA0D0B3009A34E2 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignInSwift;
+		};
+		69BC2CB82EA0EB69009A34E2 /* FacebookCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 69BC2CA12EA0D071009A34E2 /* XCRemoteSwiftPackageReference "facebook-ios-sdk" */;
+			productName = FacebookCore;
+		};
+		69BC2CBC2EA0EB69009A34E2 /* FacebookLogin */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 69BC2CA12EA0D071009A34E2 /* XCRemoteSwiftPackageReference "facebook-ios-sdk" */;
+			productName = FacebookLogin;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 6984FB922E54506C002B545F /* Project object */;
+}
