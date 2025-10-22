@@ -33,14 +33,24 @@ struct ImagePicker: UIViewControllerRepresentable {
         }
         
         func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
-            if let uiImage = info[.originalImage] as? UIImage {
-                parent.image = uiImage
+            // 在主线程上更新图片
+            DispatchQueue.main.async {
+                if let uiImage = info[.originalImage] as? UIImage {
+                    self.parent.image = uiImage
+                }
+                
+                // 延迟关闭，确保图片已设置
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    self.parent.presentationMode.wrappedValue.dismiss()
+                }
             }
-            parent.presentationMode.wrappedValue.dismiss()
         }
         
         func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
-            parent.presentationMode.wrappedValue.dismiss()
+            // 在主线程上关闭
+            DispatchQueue.main.async {
+                self.parent.presentationMode.wrappedValue.dismiss()
+            }
         }
     }
 }

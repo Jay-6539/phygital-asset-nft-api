@@ -155,6 +155,8 @@ struct DebugDashboardSheet: View {
                                 .foregroundColor(.red)
                         }
                     }
+                    
+                    ClearOfficeDataButton()
                 }
             }
             .navigationTitle("Debug Dashboard")
@@ -167,6 +169,114 @@ struct DebugDashboardSheet: View {
                 }
             }
         }
+    }
+}
+
+// 清理 Office Map 数据的按钮
+struct ClearOfficeDataButton: View {
+    @State private var showConfirmation = false
+    @State private var isClearing = false
+    @State private var showResult = false
+    @State private var resultMessage = ""
+    
+    var body: some View {
+        Button(action: {
+            showConfirmation = true
+        }) {
+            HStack {
+                Image(systemName: "building.2")
+                    .foregroundColor(.orange)
+                Text("Clear Office Map Assets")
+                    .foregroundColor(.orange)
+            }
+        }
+        .disabled(isClearing)
+        .alert("⚠️ 确认清空 Office Map", isPresented: $showConfirmation) {
+            Button("取消", role: .cancel) {}
+            Button("确认清空", role: .destructive) {
+                clearOfficeData()
+            }
+        } message: {
+            Text("此操作将删除：\n• 所有本地 Office Assets\n• 所有云端 Office Assets\n• 所有 Oval Office Check-ins\n\n⚠️ 此操作不可逆！")
+        }
+        .alert("清理结果", isPresented: $showResult) {
+            Button("确定") {
+                showResult = false
+            }
+        } message: {
+            Text(resultMessage)
+        }
+        .overlay {
+            if isClearing {
+                ProgressView()
+            }
+        }
+    }
+    
+    private func clearOfficeData() {
+        isClearing = true
+        
+        Task {
+            do {
+                Logger.database("🗑️ 开始清理 Office Map 数据...")
+                
+                // 1. 清理本地和云端 Assets
+                PersistenceManager.shared.clearAllData()
+                
+                // 2. 清理 Oval Office Check-ins
+                try await clearOvalOfficeCheckIns()
+                
+                // 延迟确保操作完成
+                try await Task.sleep(nanoseconds: 1_000_000_000)
+                
+                await MainActor.run {
+                    isClearing = false
+                    resultMessage = "✅ 清理完成！\n\n已删除：\n• 本地 Office Assets\n• 云端 Office Assets\n• Oval Office Check-ins"
+                    showResult = true
+                    Logger.success("✅ Office Map 数据清理完成")
+                }
+            } catch {
+                await MainActor.run {
+                    isClearing = false
+                    resultMessage = "❌ 清理失败\n\n\(error.localizedDescription)"
+                    showResult = true
+                    Logger.error("❌ 清理失败: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+    
+    private func clearOvalOfficeCheckIns() async throws {
+        let baseURL = SupabaseConfig.url
+        let apiKey = SupabaseConfig.anonKey
+        
+        // 删除所有 oval_office_checkins 记录
+        guard let url = URL(string: "\(baseURL)/rest/v1/oval_office_checkins") else {
+            throw NSError(domain: "InvalidURL", code: -1)
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        request.setValue(apiKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("*", forHTTPHeaderField: "Prefer")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NSError(domain: "InvalidResponse", code: -1)
+        }
+        
+        Logger.debug("Clear response: \(httpResponse.statusCode)")
+        Logger.debug("Clear response body: \(String(data: data, encoding: .utf8) ?? "")")
+        
+        guard httpResponse.statusCode == 204 || httpResponse.statusCode == 200 else {
+            throw NSError(domain: "DeleteFailed", code: httpResponse.statusCode, userInfo: [
+                NSLocalizedDescriptionKey: "HTTP \(httpResponse.statusCode)"
+            ])
+        }
+        
+        Logger.success("✅ Oval Office Check-ins 清理完成")
     }
 }
 

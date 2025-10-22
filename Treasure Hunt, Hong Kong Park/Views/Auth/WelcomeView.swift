@@ -30,35 +30,47 @@ struct WelcomeView: View {
         VStack(spacing: 0) {
             // 顶部导航区域 - 固定高度46px，与其他页面一致
             HStack {
-                // 返回按钮
-                Button(action: {
-                    showWelcome = false
-                    showTerms = true
-                }) {
-                    Image(systemName: "chevron.left")
-                        .font(.title3)
-                        .fontWeight(.bold)
-                        .foregroundColor(.black)
-                        .frame(width: 30, height: 30)
-                        .background(Color.white.opacity(0.9), in: Circle())
-                        .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
-                }
-                .padding(.top, 8)
-                .padding(.leading, 8)
-                
                 Spacer()
                 
-                // Sign Out 按钮
+                // Sign Out 按钮 - 精致的毛玻璃小按钮
                 Button(action: onSignOut) {
-                    HStack(spacing: 4) {
-                        Text("sign out")
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                        
-                        Image(systemName: "rectangle.portrait.and.arrow.right")
-                            .font(.system(size: 18))
-                            .foregroundColor(appGreen)
+                    Text("Sign Out")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(appGreen)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                    .background {
+                        ZStack {
+                            Color.clear.background(.ultraThinMaterial)
+                            LinearGradient(
+                                gradient: Gradient(colors: [
+                                    appGreen.opacity(0.12),
+                                    appGreen.opacity(0.04)
+                                ]),
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        }
                     }
+                    .cornerRadius(8)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .strokeBorder(
+                                LinearGradient(
+                                    gradient: Gradient(stops: [
+                                        .init(color: Color.white.opacity(0.5), location: 0.0),
+                                        .init(color: Color.white.opacity(0.0), location: 0.3),
+                                        .init(color: appGreen.opacity(0.15), location: 0.7),
+                                        .init(color: appGreen.opacity(0.3), location: 1.0)
+                                    ]),
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 1.2
+                            )
+                    )
+                    .shadow(color: appGreen.opacity(0.15), radius: 6, x: 0, y: 3)
+                    .shadow(color: Color.black.opacity(0.08), radius: 1, x: 0, y: 1)
                 }
                 .padding(.top, 8)
                 .padding(.trailing, 16)

@@ -233,10 +233,144 @@ class NFCManager: NSObject, ObservableObject, NFCNDEFReaderSessionDelegate {
             Logger.nfc("NFC tag read successfully for exploration")
             Logger.info("Found \(message.records.count) NDEF records")
             
-            // 显示成功消息
+            // 尝试从NDEF记录中读取UUID
+            var readUUID: String? = nil
+            for record in message.records {
+                // wellKnownTypeTextPayload 格式: [语言代码长度(1 byte)][语言代码(2 bytes "en")][实际文本]
+                // 所以我们需要跳过前3个字节
+                Logger.debug("📦 NDEF record type: \(record.typeNameFormat.rawValue)")
+                Logger.debug("📦 NDEF payload 长度: \(record.payload.count) bytes")
+                
+                if record.payload.count > 3 {
+                    // 打印原始payload的十六进制表示以便调试
+                    let hexString = record.payload.map { String(format: "%02X", $0) }.joined(separator: " ")
+                    Logger.debug("📦 原始 NDEF payload (hex): \(hexString)")
+                    
+                    // Text Record格式分析：
+                    // Byte 0: Status byte (包含编码和语言代码长度)
+                    let statusByte = record.payload[0]
+                    let isUTF16 = (statusByte & 0x80) != 0 // 最高位表示是否为UTF-16
+                    let languageCodeLength = Int(statusByte & 0x3F) // 低6位是语言代码长度
+                    Logger.debug("📦 语言代码长度: \(languageCodeLength) bytes")
+                    Logger.debug("📦 编码格式: \(isUTF16 ? "UTF-16" : "UTF-8")")
+                    
+                    // 跳过 status byte + 语言代码
+                    let textStartIndex = 1 + languageCodeLength
+                    
+                    if record.payload.count > textStartIndex {
+                        let textData = record.payload.subdata(in: textStartIndex..<record.payload.count)
+                        
+                        // 根据编码格式选择解码方式
+                        let encoding: String.Encoding = isUTF16 ? .utf16 : .utf8
+                        
+                        if let payload = String(data: textData, encoding: encoding) {
+                            Logger.debug("📦 解析后的 NDEF payload: '\(payload)'")
+                            let cleanPayload = payload.trimmingCharacters(in: .whitespacesAndNewlines)
+                            
+                            // 检查是否为有效的UUID（20个字符，全是字母数字）
+                            if cleanPayload.count == 20 {
+                                let alphanumericSet = CharacterSet.alphanumerics
+                                if cleanPayload.unicodeScalars.allSatisfy({ alphanumericSet.contains($0) }) {
+                                    readUUID = cleanPayload
+                                    Logger.success("✅ 从NFC读取到有效UUID: \(readUUID!)")
+                                    break
+                                } else {
+                                    Logger.warning("⚠️ Payload长度正确但包含非字母数字字符: '\(cleanPayload)'")
+                                }
+                            } else {
+                                Logger.warning("⚠️ Payload长度不正确: \(cleanPayload.count) (期望20)")
+                            }
+                        } else {
+                            Logger.warning("⚠️ 无法将payload解码为\(isUTF16 ? "UTF-16" : "UTF-8")字符串")
+                        }
+                    } else {
+                        Logger.warning("⚠️ Text start index超出payload范围")
+                    }
+                } else {
+                    Logger.warning("⚠️ NDEF payload 太短: \(record.payload.count) bytes")
+                }
+            }
+            
+            // 如果没有读取到UUID，说明是空白NFC标签
+            if readUUID == nil {
+                Logger.warning("⚠️ 空白NFC标签，正在生成并写入UUID...")
+                
+                // 生成新的UUID
+                let newUUID = UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(20).description
+                readUUID = newUUID
+                Logger.success("✅ 生成新UUID: \(newUUID)")
+                
+                // 将UUID写入到NFC标签
+                guard let payload = NFCNDEFPayload.wellKnownTypeTextPayload(
+                    string: newUUID,
+                    locale: Locale(identifier: "en")
+                ) else {
+                    Logger.error("❌ 无法创建NDEF payload")
+                    session.alertMessage = "空白标签，已生成UUID但无法写入"
+                    
+                    // 即使写入失败，仍使用生成的UUID
+                    DispatchQueue.main.async {
+                        self.assetUUID = newUUID
+                        if self.currentPhase == .checkInFirstScan {
+                            self.currentPhase = .checkInInput
+                        }
+                        self.didDetectNFC = true
+                        self.onNFCDetected?()
+                    }
+                    
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        session.invalidate()
+                    }
+                    return
+                }
+                
+                let ndefMessage = NFCNDEFMessage(records: [payload])
+                
+                // 写入UUID到标签
+                tag.writeNDEF(ndefMessage) { error in
+                    if let error = error {
+                        Logger.error("❌ 写入UUID失败: \(error.localizedDescription)")
+                        session.alertMessage = "UUID已生成但写入失败，请重试"
+                    } else {
+                        Logger.success("✅ UUID成功写入空白NFC标签！")
+                        session.alertMessage = "空白NFC标签已初始化"
+                    }
+                    
+                    DispatchQueue.main.async {
+                        self.assetUUID = newUUID
+                        Logger.success("✅ assetUUID 已设置为: \(self.assetUUID)")
+                        
+                        if self.currentPhase == .checkInFirstScan {
+                            self.currentPhase = .checkInInput
+                            Logger.debug("✅ Check-in第一次扫描完成，进入输入阶段")
+                        }
+                        
+                        self.didDetectNFC = true
+                        self.nfcMessage = "NFC tag detected successfully"
+                        self.onNFCDetected?()
+                    }
+                    
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        session.invalidate()
+                    }
+                }
+                return
+            }
+            
+            // 显示成功消息（从标签读取到UUID的情况）
             session.alertMessage = self.customSuccessMessage
             
             DispatchQueue.main.async {
+                // 设置读取到的UUID
+                self.assetUUID = readUUID ?? ""
+                Logger.success("✅ assetUUID 已设置为: \(self.assetUUID)")
+                
+                // 根据当前阶段更新下一个阶段
+                if self.currentPhase == .checkInFirstScan {
+                    self.currentPhase = .checkInInput
+                    Logger.debug("✅ Check-in第一次扫描完成，进入输入阶段")
+                }
+                
                 self.didDetectNFC = true
                 self.nfcMessage = "NFC tag detected successfully"
                 self.onNFCDetected?()
@@ -352,14 +486,76 @@ class NFCManager: NSObject, ObservableObject, NFCNDEFReaderSessionDelegate {
                     self.readAndVerifyUUID(tag: tag, session: session)
                     
                 case .checkInFirstScan:
-                    // Check-in第一次扫描：读取并验证UUID
-                    Logger.debug("Attempting to read UUID from tag for check-in (first scan)...")
-                    self.readAndVerifyUUID(tag: tag, session: session)
+                    // Check-in第一次扫描：读取NFC UUID
+                    Logger.debug("NFC tag detected for check-in (first scan), reading UUID...")
+                    // 读取UUID
+                    self.readAnyNFCTag(tag: tag, session: session)
                     
                 case .checkInSecondScan:
-                    // Check-in第二次扫描：只检测NFC标签存在，不验证UUID
-                    Logger.debug("Attempting to detect NFC tag for check-out (no UUID verification)...")
-                    self.readAnyNFCTag(tag: tag, session: session)
+                    // Check-in第二次扫描：读取NFC UUID确认
+                    Logger.debug("Detected NFC tag for check-out confirmation, reading UUID...")
+                    // 读取UUID确认
+                    tag.readNDEF { message, error in
+                        if let error = error {
+                            Logger.error("Read error: \(error.localizedDescription)")
+                            session.alertMessage = self.customSuccessMessage
+                            session.invalidate()
+                            DispatchQueue.main.async {
+                                self.didDetectNFC = true
+                                self.currentPhase = .checkInCompleted
+                                self.onNFCDetected?()
+                            }
+                            return
+                        }
+                        
+                        // 尝试读取UUID
+                        var readUUID: String? = nil
+                        if let message = message {
+                            for record in message.records {
+                                // Text Record格式分析
+                                if record.payload.count > 3 {
+                                    let statusByte = record.payload[0]
+                                    let isUTF16 = (statusByte & 0x80) != 0
+                                    let languageCodeLength = Int(statusByte & 0x3F)
+                                    let textStartIndex = 1 + languageCodeLength
+                                    
+                                    if record.payload.count > textStartIndex {
+                                        let textData = record.payload.subdata(in: textStartIndex..<record.payload.count)
+                                        let encoding: String.Encoding = isUTF16 ? .utf16 : .utf8
+                                        
+                                        if let payload = String(data: textData, encoding: encoding) {
+                                            let cleanPayload = payload.trimmingCharacters(in: .whitespacesAndNewlines)
+                                            if cleanPayload.count == 20 {
+                                                let alphanumericSet = CharacterSet.alphanumerics
+                                                if cleanPayload.unicodeScalars.allSatisfy({ alphanumericSet.contains($0) }) {
+                                                    readUUID = cleanPayload
+                                                    Logger.success("✅ Check-out时读取到有效UUID: \(readUUID!)")
+                                                    break
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // 更新assetUUID（如果读取成功）
+                        if let uuid = readUUID {
+                            DispatchQueue.main.async {
+                                self.assetUUID = uuid
+                                Logger.success("✅ 更新assetUUID为: \(uuid)")
+                            }
+                        }
+                        
+                        session.alertMessage = self.customSuccessMessage
+                        session.invalidate()
+                        
+                        DispatchQueue.main.async {
+                            self.didDetectNFC = true
+                            self.currentPhase = .checkInCompleted
+                            self.onNFCDetected?()
+                        }
+                    }
                     
                 case .exploreScan:
                     // 探索扫描：读取任何NFC标签
@@ -962,7 +1158,10 @@ struct ContentView: View {
     @State private var hasPreloadedMap: Bool = false  // 是否已完成预加载
     @State private var isFromSocialLogin: Bool = false  // 是否来自社交登录
     @State private var currentSheetView: SheetViewType? = nil  // 当前显示的sheet类型
+    @State private var showBuildingHistory: Bool = false  // 显示建筑的历史记录（在地图内部，不使用fullScreenCover）
     @State private var nfcCoordinate: CLLocationCoordinate2D? = nil  // NFC的GPS坐标
+    @State private var currentNfcUuid: String? = nil  // 当前NFC的UUID
+    @State private var isNewNfcTag: Bool = false  // 标记当前NFC是否为新标签（跳过GPS检查）
     @State private var showCheckInInputModal: Bool = false  // 导航界面中的Check-in输入模态框
     
     // 社交登录管理器
@@ -1034,37 +1233,26 @@ struct ContentView: View {
     @State private var showNoResultsAlert: Bool = false  // 显示无结果提示
     @State private var initialRegion: MKCoordinateRegion? = nil  // 初始地图区域
     @State private var initialClusters: [BuildingCluster] = []  // 初始聚合状态
+    @State private var buildingDetailRegion: MKCoordinateRegion? = nil  // 点击建筑前的地图区域（用于关闭信息框时恢复）
+    @State private var buildingDetailClusters: [BuildingCluster] = []  // 点击建筑前的聚合状态（用于关闭信息框时恢复）
+    
+    // O按钮滑出菜单
+    @State private var showOButtonMenu: Bool = false  // 是否显示O按钮的滑出菜单
+    @State private var showMyHistory: Bool = false  // 是否显示用户的历史记录
     
     @State private var routePolyline: MKPolyline? = nil
     @State private var routeDistanceMeters: CLLocationDistance? = nil
     @State private var isRouting: Bool = false
     @State private var showClue: Bool = false
     @State private var showNavigation: Bool = false
+    @State private var showGPSError: Bool = false  // GPS错误提示（独立状态，避免sheet冲突）
     // Office Map状态已移到OvalOfficeViewModel
-    // @State private var showOvalOffice: Bool = false
-    // @State private var ovalOfficeVM.ovalOfficeScale: CGFloat = 1.0
-    // @State private var ovalOfficeVM.ovalOfficeOffset: CGSize = .zero
-    // @State private var ovalOfficeVM.ovalOfficeLastMagnification: CGFloat = 1.0
-    // @State private var ovalOfficeVM.ovalOfficeDragStartOffset: CGSize = .zero
-    // @State private var ovalOfficeVM.isRegisteringAsset: Bool = false
-    // @State private var ovalOfficeVM.showAssetInfoModal: Bool = false
-    // @State private var ovalOfficeVM.selectedAssetInfo: AssetInfo? = nil
-    // @State private var ovalOfficeVM.isNewAsset: Bool = false
     @State private var showUserDetailModal: Bool = false
     @State private var selectedUserInteraction: UserInteraction? = nil
     @State private var currentInteractionIndex: Int = 0  // 当前查看的历史记录索引
     @State private var showNFCAlreadyRegisteredAlert: Bool = false  // NFC已注册提示弹窗
     @State private var alreadyRegisteredNFCUUID: String = ""  // 已注册的NFC UUID
     
-    // 模拟用户互动数据（已废弃，现在使用Asset的userInteractions数组）
-    // private let mockUserInteractions: [UserInteraction] = []
-    // Asset相关状态已移到OvalOfficeViewModel
-    // @State private var ovalOfficeVM.officeAssets: [AssetInfo] = []
-    // @State private var ovalOfficeVM.showAssetInputModal: Bool = false
-    // @State private var ovalOfficeVM.selectedAssetIndex: Int? = nil
-    // @State private var ovalOfficeVM.assetName: String = ""
-    // @State private var ovalOfficeVM.assetImage: UIImage? = nil
-    // @State private var ovalOfficeVM.assetDescription: String = ""
     @State private var clueText: String = ""
     @State private var clueImageURL: URL? = nil
     @State private var showFullScreenImage: Bool = false
@@ -1810,14 +1998,17 @@ struct ContentView: View {
                                                 showMap = false
                                             }
                                             Logger.database("Opening Oval Office from map")
-                                        } else {
-                                            // 普通建筑：居中并显示详情
-                                            withAnimation(.easeInOut(duration: 0.3)) {
-                                                currentRegion.center = building.coordinate
-                                                cameraPosition = .region(currentRegion)
-                                            }
-                                            
-                                            selectedTreasure = building
+                        } else {
+                            // 普通建筑：保存当前地图状态，然后居中并显示详情
+                            buildingDetailRegion = currentRegion  // 保存当前地图状态
+                            buildingDetailClusters = buildingClusters  // 保存当前聚合状态
+                            
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                currentRegion.center = building.coordinate
+                                cameraPosition = .region(currentRegion)
+                            }
+                            
+                            selectedTreasure = building
                                             isSearchMode = false  // 退出搜索模式
                                             routePolyline = nil
                                             routeDistanceMeters = nil
@@ -1977,6 +2168,17 @@ struct ContentView: View {
                     }
                     // 请求位置权限
                     locationManager.requestLocation()
+                    
+                    // 设置地图界面的NFC探索扫描回调
+                    nfcManager.onNFCDetected = {
+                        DispatchQueue.main.async {
+                            if self.nfcManager.currentPhase == .exploreScan || self.nfcManager.didDetectNFC {
+                                Logger.success("NFC探索扫描成功，查找对应的建筑...")
+                                // 查找匹配的建筑（基于NFC UUID）
+                                self.handleNFCExploreResult()
+                            }
+                        }
+                    }
                 }
                 .onMapCameraChange(frequency: .onEnd) { context in
                     // 地图缩放或移动结束时更新聚合
@@ -1994,85 +2196,121 @@ struct ContentView: View {
                 }
                 
 
-                // 右下角按钮组
-                VStack(spacing: 10) {
-                    // 指南针按钮 - 定位到用户位置
-                    Button(action: { 
-                        centerOnUserLocation()
-                    }) {
-                        ZStack {
-                            Circle().fill(Color.white)
-                            Image(systemName: "location.north.line")
-                                .font(.system(size: 16))
-                                .foregroundStyle(.black)
+                // 右下角所有按钮组 - 统一布局
+                VStack(alignment: .trailing, spacing: 10) {
+                    // 固定按钮组（定位、恢复、搜索）
+                    VStack(spacing: 10) {
+                        // 指南针按钮 - 定位到用户位置
+                        Button(action: { 
+                            centerOnUserLocation()
+                        }) {
+                            ZStack {
+                                Circle().fill(Color.white)
+                                Image(systemName: "location.north.line")
+                                    .font(.system(size: 16))
+                                    .foregroundStyle(.black)
+                            }
+                            .frame(width: 36, height: 36)
+                            .shadow(radius: 2)
                         }
-                        .frame(width: 36, height: 36)
-                        .shadow(radius: 2)
+                        
+                        // 恢复初始状态按钮
+                        Button(action: { 
+                            restoreInitialMapState()
+                        }) {
+                            ZStack {
+                                Circle().fill(Color.white)
+                                Image(systemName: "arrow.counterclockwise")
+                                    .font(.system(size: 16))
+                                    .foregroundStyle(.black)
+                            }
+                            .frame(width: 36, height: 36)
+                            .shadow(radius: 2)
+                        }
+                        
+                        // 搜索按钮
+                        Button(action: { 
+                            showSearch = true
+                        }) {
+                            ZStack {
+                                Circle().fill(Color.white)
+                                Image(systemName: "magnifyingglass")
+                                    .font(.system(size: 16))
+                                    .foregroundStyle(.black)
+                            }
+                            .frame(width: 36, height: 36)
+                            .shadow(radius: 2)
+                        }
                     }
                     
-                    // 恢复初始状态按钮
-                    Button(action: { 
-                        restoreInitialMapState()
-                    }) {
-                        ZStack {
-                            Circle().fill(Color.white)
-                            Image(systemName: "arrow.counterclockwise")
-                                .font(.system(size: 16))
-                                .foregroundStyle(.black)
+                    // O按钮菜单组 - 不影响上面的固定按钮
+                    HStack(spacing: 8) {
+                        // 滑出的两个按钮
+                        if showOButtonMenu {
+                            // Me 按钮
+                            Button(action: {
+                                Logger.debug("Me button tapped!")
+                                showOButtonMenu = false
+                                
+                                // 先关闭地图，然后显示历史记录
+                                showMap = false
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                    showMyHistory = true
+                                    Logger.debug("showMyHistory set to: \(showMyHistory)")
+                                }
+                            }) {
+                                ZStack {
+                                    Circle().fill(Color.white)
+                                    Text("Me")
+                                        .font(.system(size: 13, weight: .bold))
+                                        .foregroundStyle(appGreen)
+                                }
+                                .frame(width: 36, height: 36)
+                                .shadow(radius: 2)
+                            }
+                            .transition(.move(edge: .trailing).combined(with: .opacity))
+                            
+                            // Tap 按钮
+                            Button(action: {
+                                showOButtonMenu = false
+                                // 启动NFC扫描（探索模式，不验证GPS）
+                                nfcManager.startExploreScan()
+                            }) {
+                                ZStack {
+                                    Circle().fill(Color.white)
+                                    Text("Tap")
+                                        .font(.system(size: 12, weight: .bold))
+                                        .foregroundStyle(appGreen)
+                                }
+                                .frame(width: 36, height: 36)
+                                .shadow(radius: 2)
+                            }
+                            .transition(.move(edge: .trailing).combined(with: .opacity))
                         }
-                        .frame(width: 36, height: 36)
-                        .shadow(radius: 2)
-                    }
-                    
-                    // 搜索按钮
-                    Button(action: { 
-                        showSearch = true
-                    }) {
-                        ZStack {
-                            Circle().fill(Color.white)
-                            Image(systemName: "magnifyingglass")
-                                .font(.system(size: 16))
-                                .foregroundStyle(.black)
+                        
+                        // O按钮 - 切换菜单显示
+                        Button(action: { 
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                // 如果搜索框打开，关闭搜索框并同时打开菜单
+                                if showSearch {
+                                    showSearch = false
+                                    showOButtonMenu = true
+                                } else {
+                                    showOButtonMenu.toggle()
+                                }
+                            }
+                        }) {
+                            ZStack {
+                                Circle().fill(appGreen)
+                                Text("O")
+                                    .font(.headline)
+                                    .fontWeight(.bold)
+                                    .foregroundStyle(.white)
+                            }
+                            .frame(width: 36, height: 36)
+                            .shadow(radius: 2)
+                            .rotationEffect(.degrees(showOButtonMenu ? 45 : 0))
                         }
-                        .frame(width: 36, height: 36)
-                        .shadow(radius: 2)
-                    }
-                    
-                    // Oval Office定位按钮
-                    Button(action: { 
-                        locateOvalOffice()
-                    }) {
-                        ZStack {
-                            Circle().fill(appGreen)
-                            Text("O")
-                                .font(.headline)
-                                .fontWeight(.bold)
-                                .foregroundStyle(.white)
-                        }
-                        .frame(width: 36, height: 36)
-                        .shadow(radius: 2)
-                    }
-                    
-                    // 缩放按钮
-                    Button(action: { zoom(by: 0.5) }) {
-                        ZStack {
-                            Circle().fill(Color.white)
-                            Text("+")
-                                .font(.headline)
-                                .foregroundStyle(.black)
-                        }
-                        .frame(width: 36, height: 36)
-                        .shadow(radius: 1)
-                    }
-                    Button(action: { zoom(by: 2.0) }) {
-                        ZStack {
-                            Circle().fill(Color.white)
-                            Text("-")
-                                .font(.headline)
-                                .foregroundStyle(.black)
-                        }
-                        .frame(width: 36, height: 36)
-                        .shadow(radius: 1)
                     }
                 }
                 .padding(.trailing, 12)
@@ -2164,6 +2402,31 @@ struct ContentView: View {
                         .onTapGesture {
                             self.selectedTreasure = nil
                             self.showClue = false
+                            
+                            // 恢复关闭信息框前的地图状态
+                            if let savedRegion = buildingDetailRegion {
+                                withAnimation(.easeInOut(duration: 0.3)) {
+                                    currentRegion = savedRegion
+                                    cameraPosition = .region(savedRegion)
+                                }
+                                
+                                // 基于恢复后的地图状态重新计算聚合
+                                currentZoomLevel = savedRegion.span.latitudeDelta
+                                buildingClusters = BuildingClusteringManager.shared.clusterBuildings(
+                                    treasures,
+                                    zoomLevel: currentZoomLevel,
+                                    forceExpand: false
+                                )
+                                
+                                // 清除路径
+                                routePolyline = nil
+                                routeDistanceMeters = nil
+                                isRouting = false
+                                
+                                // 清除保存的状态
+                                buildingDetailRegion = nil
+                                buildingDetailClusters = []
+                            }
                         }
                         
                         VStack(alignment: .leading, spacing: 12) {
@@ -2176,6 +2439,31 @@ struct ContentView: View {
                 Button(action: {
                                 self.selectedTreasure = nil
                                 self.showClue = false // 同时关闭线索框
+                                
+                                // 恢复关闭信息框前的地图状态
+                                if let savedRegion = buildingDetailRegion {
+                                    withAnimation(.easeInOut(duration: 0.3)) {
+                                        currentRegion = savedRegion
+                                        cameraPosition = .region(savedRegion)
+                                    }
+                                    
+                                    // 基于恢复后的地图状态重新计算聚合
+                                    currentZoomLevel = savedRegion.span.latitudeDelta
+                                    buildingClusters = BuildingClusteringManager.shared.clusterBuildings(
+                                        treasures,
+                                        zoomLevel: currentZoomLevel,
+                                        forceExpand: false
+                                    )
+                                    
+                                    // 清除路径
+                                    routePolyline = nil
+                                    routeDistanceMeters = nil
+                                    isRouting = false
+                                    
+                                    // 清除保存的状态
+                                    buildingDetailRegion = nil
+                                    buildingDetailClusters = []
+                                }
                             }) {
                                 Image(systemName: "xmark")
                                     .font(.caption)
@@ -2556,6 +2844,29 @@ struct ContentView: View {
                     .transition(.opacity.combined(with: .scale(scale: 0.9)))
                     .animation(.easeInOut(duration: 0.3), value: showNoResultsAlert)
                 }
+                
+                // Check-in输入模态框覆盖层（主地图上的）
+                if showCheckInInputModal {
+                    CheckInInputModal(
+                        assetName: $ovalOfficeVM.assetName,
+                        assetImage: $ovalOfficeVM.assetImage,
+                        assetDescription: $ovalOfficeVM.assetDescription,
+                        appGreen: appGreen,
+                        nfcManager: nfcManager,
+                        onCancel: {
+                            // 关闭输入框
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                showCheckInInputModal = false
+                            }
+                            // 重置NFC管理器和注册状态
+                            nfcManager.reset()
+                        }
+                    )
+                    .onAppear {
+                        Logger.debug("🎯 CheckInInputModal已显示（主地图）")
+                    }
+                    .zIndex(3000)  // 确保输入框显示在主地图的所有内容之上
+                }
             }
             .fullScreenCover(isPresented: $showNavigation) {
                 // 导航模式的全屏地图
@@ -2634,6 +2945,7 @@ struct ContentView: View {
                         }
                     }
                     .padding(.bottom, 50)  // 地图下边缘向上提升50像素
+                    .zIndex(0)  // 地图层在最底部
                 }
                     
                     // 返回按钮
@@ -2723,25 +3035,82 @@ struct ContentView: View {
                             }
                         }
                     }
+                    .zIndex(100)  // 按钮层在地图之上
                     
-                    // Asset History覆盖层 - 直接浮现在导航界面上
-                    if currentSheetView == .assetHistory {
+                    
+                    // Asset History覆盖层 - 直接浮现在导航界面上（仅用于建筑扫描模式）
+                    if showBuildingHistory {
                         AssetHistoryView(
                             targetBuilding: selectedTreasure,
                             nfcCoordinate: nfcCoordinate,
+                            nfcUuid: currentNfcUuid,
                             onBackToNavigation: {
-                                currentSheetView = nil
-                                nfcCoordinate = nil
+                                Logger.debug("🔙 返回初始主地图界面")
+                                Logger.debug("   当前 selectedTreasure: \(selectedTreasure?.name ?? "nil")")
+                                Logger.debug("   当前 currentSheetView: \(String(describing: currentSheetView))")
+                                
+                                // ⚠️ 设置标志，防止 onMapCameraChange 干扰
+                                isExpandingCluster = true
+                                
+                                // 使用 DispatchQueue 确保视图立即刷新
+                                DispatchQueue.main.async {
+                                    // 立即关闭所有视图
+                                    showBuildingHistory = false
+                                    currentSheetView = nil
+                                    showNavigation = false  // ⚠️ 关键：关闭导航全屏界面
+                                    
+                                    // 清除所有其他状态
+                                    nfcCoordinate = nil
+                                    currentNfcUuid = nil
+                                    routePolyline = nil
+                                    routeDistanceMeters = nil
+                                    isRouting = false
+                                    selectedTreasure = nil
+                                    buildingDetailRegion = nil
+                                    buildingDetailClusters = []
+                                    
+                                    Logger.debug("   清除后 selectedTreasure: \(selectedTreasure?.name ?? "nil")")
+                                    Logger.debug("   清除后 currentSheetView: \(String(describing: currentSheetView))")
+                                
+                                    // 重置到初始地图区域（全香港视图）
+                                    let initialRegion = MKCoordinateRegion(
+                                        center: CLLocationCoordinate2D(latitude: 22.2731, longitude: 114.0056),
+                                        span: MKCoordinateSpan(latitudeDelta: 0.1931, longitudeDelta: 0.3703)
+                                    )
+                                    
+                                    // 基于初始视图重新计算聚合
+                                    currentZoomLevel = initialRegion.span.latitudeDelta
+                                    buildingClusters = BuildingClusteringManager.shared.clusterBuildings(
+                                        treasures,
+                                        zoomLevel: currentZoomLevel,
+                                        forceExpand: false
+                                    )
+                                    Logger.success("✅ 已返回初始主地图，显示 \(buildingClusters.count) 个聚合点")
+                                    Logger.debug("   buildingClusters.count: \(buildingClusters.count)")
+                                    Logger.debug("   selectedTreasure 仍为: \(selectedTreasure?.name ?? "nil")")
+                                    
+                                    // 最后更新地图位置
+                                    withAnimation(.easeInOut(duration: 0.3)) {
+                                        currentRegion = initialRegion
+                                        cameraPosition = .region(initialRegion)
+                                    }
+                                    
+                                    Logger.debug("   地图更新后 selectedTreasure: \(selectedTreasure?.name ?? "nil")")
+                                }
                             },
                             onShowNFCMismatch: {
-                                currentSheetView = .nfcMismatchAlert
+                                showGPSError = true  // 使用独立状态，避免sheet冲突
                             },
                             onStartCheckIn: { buildingUUID in
                                 // 启动Check-in功能 - 直接显示输入界面，不需要NFC验证
                                 Logger.debug("Starting check-in for building UUID: \(buildingUUID)")
+                                Logger.debug("当前状态 - showNavigation: \(showNavigation), currentSheetView: \(String(describing: currentSheetView))")
+                                Logger.debug("showCheckInInputModal: \(showCheckInInputModal)")
                                 
                                 // 直接显示输入界面 - 使用覆盖层而不是sheet
                                 if let building = selectedTreasure {
+                                    Logger.debug("✅ selectedTreasure存在: \(building.name)")
+                                    
                                     // 设置NFC状态为checkInInput
                                     nfcManager.currentPhase = .checkInInput
                                     nfcManager.didDetectNFC = true
@@ -2769,30 +3138,47 @@ struct ContentView: View {
                                     }
                                     
                                     // 使用动画显示输入模态框，实现顺滑过渡
+                                    Logger.debug("⏰ 即将设置 showCheckInInputModal = true")
                                     withAnimation(.easeInOut(duration: 0.4)) {
                                         showCheckInInputModal = true
                                     }
+                                    Logger.debug("✅ showCheckInInputModal已设置为: \(showCheckInInputModal)")
+                                } else {
+                                    Logger.error("❌ selectedTreasure 为 nil!")
                                 }
                             }
                         )
+                        .zIndex(500)  // 历史记录视图的zIndex
                     }
                     
-                    // NFC错误覆盖层
-                    if currentSheetView == .nfcMismatchAlert {
+                    // NFC错误覆盖层（使用独立状态避免sheet冲突）
+                    if showGPSError {
                         NFCErrorView(
                             onBack: {
-                                currentSheetView = nil
+                                Logger.debug("🔙 关闭GPS错误框")
+                                
+                                // 关闭错误框
+                                showGPSError = false
+                                
+                                // 清除NFC相关状态，避免重复触发
                                 nfcCoordinate = nil
+                                currentNfcUuid = nil
+                                
+                                Logger.success("✅ 错误框已关闭")
                             }
                         )
+                        .onAppear {
+                            Logger.debug("🎯 GPS错误视图已显示")
+                        }
+                        .zIndex(1000)
                     }
                     
                     // Check-in输入模态框覆盖层
                     if showCheckInInputModal {
                         CheckInInputModal(
-                            ovalOfficeVM.assetName: $ovalOfficeVM.assetName,
-                            ovalOfficeVM.assetImage: $ovalOfficeVM.assetImage,
-                            ovalOfficeVM.assetDescription: $ovalOfficeVM.assetDescription,
+                            assetName: $ovalOfficeVM.assetName,
+                            assetImage: $ovalOfficeVM.assetImage,
+                            assetDescription: $ovalOfficeVM.assetDescription,
                             appGreen: appGreen,
                             nfcManager: nfcManager,
                             onCancel: {
@@ -2804,6 +3190,10 @@ struct ContentView: View {
                                 nfcManager.reset()
                             }
                         )
+                        .onAppear {
+                            Logger.debug("🎯 CheckInInputModal已显示")
+                        }
+                        .zIndex(2000)  // 确保输入框显示在所有内容之上
                     }
                 }
             }
@@ -2819,30 +3209,64 @@ struct ContentView: View {
                             currentSheetView = nil
                         }
                     )
-                case .assetHistory, .nfcMismatchAlert:
-                    // 这些现在直接在导航界面内部显示，不需要fullScreenCover
+                case .assetHistory:
+                    // 在主地图上显示Asset历史记录（通过Tap按钮扫描的NFC）
+                    let _ = Logger.debug("🏛️ ========== 显示 NFCHistoryFullScreenView ==========")
+                    let _ = Logger.debug("🏛️ currentNfcUuid: '\(currentNfcUuid ?? "nil")'")
+                    let _ = Logger.debug("🏛️ UUID 长度: \(currentNfcUuid?.count ?? 0)")
+                    
+                    NFCHistoryFullScreenView(
+                        nfcUuid: currentNfcUuid ?? "",
+                        appGreen: appGreen,
+                        onClose: {
+                            Logger.debug("🔙 关闭NFC历史记录视图")
+                            currentSheetView = nil
+                            nfcCoordinate = nil
+                            currentNfcUuid = nil
+                        },
+                        onNavigateToBuilding: { latitude, longitude in
+                            Logger.debug("📍 导航到GPS坐标: (\(latitude), \(longitude))")
+                            
+                            // 根据GPS坐标查找最近的建筑
+                            if let building = self.findNearestBuilding(latitude: latitude, longitude: longitude) {
+                                Logger.success("✅ 找到建筑: \(building.name)")
+                                
+                                // 关闭NFC历史记录界面
+                                currentSheetView = nil
+                                nfcCoordinate = nil
+                                currentNfcUuid = nil
+                                
+                                // 延迟启动导航
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                    self.selectedTreasure = building
+                                    self.showNavigation = true
+                                }
+                            } else {
+                                Logger.warning("⚠️ 未找到对应的建筑")
+                            }
+                        },
+                        onNavigateToOvalOffice: {
+                            Logger.debug("📍 导航到Oval Office（从NFC历史记录）")
+                            
+                            // 关闭NFC历史记录界面
+                            currentSheetView = nil
+                            nfcCoordinate = nil
+                            currentNfcUuid = nil
+                            
+                            // 延迟打开Oval Office
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                self.ovalOfficeVM.showOvalOffice = true
+                            }
+                        }
+                    )
+                case .nfcMismatchAlert:
+                    // GPS错误在导航界面内部显示，主地图不需要
                     EmptyView()
         }
     }
 }
 
     // MARK: - Helper Methods
-    private func zoom(by factor: Double) {
-        // 缩放 span，并限制在合理范围内
-        let minDelta = 0.0005
-        let maxDelta = 0.1
-        var newLat = currentRegion.span.latitudeDelta * factor
-        var newLon = currentRegion.span.longitudeDelta * factor
-        newLat = min(max(newLat, minDelta), maxDelta)
-        newLon = min(max(newLon, minDelta), maxDelta)
-        currentRegion.span = MKCoordinateSpan(latitudeDelta: newLat, longitudeDelta: newLon)
-        cameraPosition = .region(currentRegion)
-        
-        // 更新聚合（用户主动缩放，不使用防抖）
-        if !treasures.isEmpty {
-            updateClusters(debounce: false)
-        }
-    }
     
     // 定位到Oval Office（ID 900）
     private func locateOvalOffice() {
@@ -2915,6 +3339,10 @@ struct ContentView: View {
             
             // 隐藏键盘
             isSearchFieldFocused = false
+            
+            // 保存当前地图状态
+            buildingDetailRegion = currentRegion
+            buildingDetailClusters = buildingClusters  // 保存当前聚合状态
             
             withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
                 currentRegion.center = building.coordinate
@@ -3015,33 +3443,272 @@ struct ContentView: View {
         Logger.success("Map state restored")
     }
     
+    // 处理NFC探索扫描结果
+    private func handleNFCExploreResult() {
+        Logger.debug("🔍 ========== 处理NFC探索扫描结果 ==========")
+        Logger.debug("🔍 从 NFCManager 读取到的 UUID: '\(nfcManager.assetUUID)'")
+        Logger.debug("🔍 UUID 长度: \(nfcManager.assetUUID.count) 字符")
+        Logger.debug("🔍 UUID 是否为空: \(nfcManager.assetUUID.isEmpty)")
+        
+        Task {
+            do {
+                // 检查NFC UUID是否已有历史记录
+                Logger.debug("🔍 开始检查 NFC UUID 是否已有历史记录...")
+                let nfcExists = try await BuildingCheckInManager.shared.checkNFCExists(nfcUuid: nfcManager.assetUUID)
+                Logger.debug("🔍 NFC exists检查结果: \(nfcExists)")
+                
+                await MainActor.run {
+                    // 设置当前NFC UUID
+                    currentNfcUuid = nfcManager.assetUUID
+                    Logger.success("✅ 已设置 currentNfcUuid = '\(currentNfcUuid ?? "nil")'")
+                    Logger.debug("   UUID长度: \(currentNfcUuid?.count ?? 0) 字符")
+                    
+                    // ⚠️ 对于 Tap 探索功能，总是显示历史记录界面
+                    // 即使没有记录，也让用户看到空列表（可以点击 "Check In Mine" 添加）
+                    Logger.success("📋 显示历史记录界面（Tap探索模式）")
+                    Logger.debug("   设置 currentSheetView = .assetHistory")
+                    Logger.debug("   传递给 AssetHistoryView 的 nfcUuid: '\(currentNfcUuid ?? "nil")'")
+                    Logger.debug("   NFC exists: \(nfcExists) (有记录: \(nfcExists), 无记录: \(!nfcExists))")
+                    
+                    isNewNfcTag = !nfcExists  // 标记是否为新标签（用于后续可能的处理）
+                    currentSheetView = .assetHistory
+                    Logger.success("   ✅ currentSheetView 已设置为 .assetHistory")
+                    
+                    // 重置NFC状态（不影响currentNfcUuid）
+                    nfcManager.reset()
+                    Logger.debug("   nfcManager.reset() 后，currentNfcUuid 仍为: '\(currentNfcUuid ?? "nil")'")
+                    Logger.debug("🔍 ========== NFC探索扫描处理完成 ==========")
+                }
+            } catch {
+                Logger.error("❌ 检查NFC历史记录失败: \(error.localizedDescription)")
+                await MainActor.run {
+                    // 出错时默认显示历史记录界面
+                    Logger.warning("⚠️ 出错，默认显示历史记录界面")
+                    // ⚠️ 即使出错，也要设置 currentNfcUuid
+                    currentNfcUuid = nfcManager.assetUUID
+                    Logger.debug("   设置 currentNfcUuid = '\(currentNfcUuid ?? "nil")'")
+                    currentSheetView = .assetHistory
+                    nfcManager.reset()
+                }
+            }
+        }
+    }
+    
+    // 显示新NFC的Check-in输入界面
+    private func showNewNFCCheckInInput() {
+        Logger.debug("🎨 显示新NFC Check-in输入界面")
+        Logger.debug("   当前 currentNfcUuid: \(currentNfcUuid ?? "nil")")
+        Logger.debug("   当前 nfcManager.assetUUID: \(nfcManager.assetUUID)")
+        
+        // 如果currentNfcUuid为空但nfcManager有UUID，恢复它
+        if (currentNfcUuid == nil || currentNfcUuid?.isEmpty == true) && !nfcManager.assetUUID.isEmpty {
+            currentNfcUuid = nfcManager.assetUUID
+            Logger.warning("⚠️ 恢复 currentNfcUuid 从 nfcManager: \(currentNfcUuid ?? "nil")")
+        }
+        
+        // 设置输入框的默认值
+        ovalOfficeVM.assetName = "New Asset"
+        ovalOfficeVM.assetImage = nil
+        ovalOfficeVM.assetDescription = ""
+        ovalOfficeVM.isNewAsset = true
+        
+        // 设置NFC回调处理保存完成（新NFC不需要GPS验证）
+        nfcManager.onNFCDetected = {
+            DispatchQueue.main.async {
+                switch self.nfcManager.currentPhase {
+                case .checkInCompleted:
+                    // 新NFC的第二次NFC验证成功，直接保存数据（跳过GPS检查）
+                    Logger.success("New NFC second scan verified, saving data (no GPS check)...")
+                    self.handleNewNFCCheckInCompletion()
+                default:
+                    break
+                }
+            }
+        }
+        
+        // 直接显示输入界面，使用覆盖层模式
+        showCheckInInputModal = true
+        
+        Logger.success("✅ 新NFC检测成功，进入输入界面（无需GPS验证）")
+    }
+    
+    // 处理新NFC的Check-in完成（跳过GPS检查）
+    private func handleNewNFCCheckInCompletion() {
+        Logger.debug("💾 处理新NFC Check-in完成（跳过GPS检查）")
+        Logger.debug("   currentNfcUuid: \(currentNfcUuid ?? "nil")")
+        Logger.debug("   nfcManager.assetUUID: \(nfcManager.assetUUID)")
+        
+        // 如果currentNfcUuid为空，尝试从nfcManager获取
+        if currentNfcUuid == nil || currentNfcUuid?.isEmpty == true {
+            currentNfcUuid = nfcManager.assetUUID.isEmpty ? nil : nfcManager.assetUUID
+            Logger.warning("⚠️ currentNfcUuid为空，从nfcManager获取: \(currentNfcUuid ?? "nil")")
+        }
+        
+        // ⚠️ 重要：在 Task 开始前保存所有值，避免 reset() 导致数据丢失
+        let savedNfcUuid = currentNfcUuid
+        let savedAssetName = ovalOfficeVM.assetName.isEmpty ? nil : ovalOfficeVM.assetName
+        let savedDescription = ovalOfficeVM.assetDescription
+        let savedImage = ovalOfficeVM.assetImage
+        
+        // 直接保存数据，不进行GPS检查
+        Task {
+            do {
+                let displayUsername = username.isEmpty ? "Guest" : username
+                
+                // 获取用户当前位置作为GPS坐标
+                let latitude = locationManager.location?.coordinate.latitude ?? 22.35
+                let longitude = locationManager.location?.coordinate.longitude ?? 114.15
+                
+                Logger.debug("💾 保存新NFC Check-in:")
+                Logger.debug("   buildingId: \(savedNfcUuid ?? "unknown")")
+                Logger.debug("   username: \(displayUsername)")
+                Logger.debug("   assetName: \(savedAssetName ?? "nil")")
+                Logger.debug("   nfcUuid: \(savedNfcUuid ?? "nil")")
+                Logger.debug("   GPS: (\(latitude), \(longitude))")
+                
+                // 保存到asset_checkins表
+                // 在探索模式下，使用一个特殊的building_id来标识这是NFC探索模式的记录
+                let explorationBuildingId = "nfc_exploration_\(savedNfcUuid ?? "unknown")"
+                
+                Logger.debug("💾 探索模式保存参数:")
+                Logger.debug("   buildingId: \(explorationBuildingId)")
+                Logger.debug("   nfcUuid: \(savedNfcUuid ?? "nil")")
+                
+                let _ = try await BuildingCheckInManager.shared.saveCheckIn(
+                    buildingId: explorationBuildingId, // 使用特殊标识作为building_id
+                    username: displayUsername,
+                    assetName: savedAssetName,
+                    description: savedDescription,
+                    image: savedImage,
+                    nfcUuid: savedNfcUuid,
+                    latitude: latitude,
+                    longitude: longitude
+                )
+                
+                await MainActor.run {
+                    Logger.success("✅ 新NFC信息保存成功")
+                    
+                    // 关闭输入模态框
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        showCheckInInputModal = false
+                    }
+                    
+                    // 重置输入
+                    ovalOfficeVM.resetAssetInput()
+                    
+                    // 重置NFC管理器
+                    nfcManager.reset()
+                    
+                    // 重置新NFC标记
+                    isNewNfcTag = false
+                    
+                    // 显示历史记录
+                    currentSheetView = .assetHistory
+                }
+            } catch {
+                Logger.error("❌ 保存新NFC信息失败: \(error.localizedDescription)")
+                await MainActor.run {
+                    // 可以在这里显示错误提示
+                    Logger.error("保存失败，请重试")
+                }
+            }
+        }
+    }
+    
     // 直接启动NFC扫描（跳过扫描页面）
     private func startDirectNFCScan() {
-        Logger.nfc("Starting direct NFC scan...")
+        Logger.nfc("Starting direct NFC scan from building...")
         
         // 使用现有的NFCManager直接启动探索扫描
         nfcManager.startExploreScan()
         
         // 设置回调处理NFC检测结果
         nfcManager.onNFCDetected = {
-            Logger.success("NFC detected in direct scan")
-            // NFC检测成功，直接进入Asset历史界面
+            Logger.success("NFC detected in direct scan from building")
+            
             DispatchQueue.main.async {
+                // ✅ 重要：设置 currentNfcUuid
+                self.currentNfcUuid = self.nfcManager.assetUUID
+                Logger.success("✅ [Building Scan] 设置 currentNfcUuid = '\(self.currentNfcUuid ?? "nil")'")
+                Logger.debug("   UUID 长度: \(self.currentNfcUuid?.count ?? 0)")
+                
                 // 使用用户当前位置作为NFC坐标（实际NFC标签的位置）
-                if let userLocation = locationManager.location {
-                    nfcCoordinate = userLocation.coordinate
+                if let userLocation = self.locationManager.location {
+                    self.nfcCoordinate = userLocation.coordinate
                     Logger.location("Using user location as NFC coordinate: \(userLocation.coordinate)")
                 } else {
                     // 备用坐标
-                    nfcCoordinate = CLLocationCoordinate2D(latitude: 22.35, longitude: 114.15)
-                    Logger.location("Using fallback coordinate as NFC coordinate: \(nfcCoordinate!)")
+                    self.nfcCoordinate = CLLocationCoordinate2D(latitude: 22.35, longitude: 114.15)
+                    Logger.location("Using fallback coordinate as NFC coordinate: \(self.nfcCoordinate!)")
                 }
-                currentSheetView = .assetHistory
+                
+                // ⚠️ 从建筑扫描NFC时，需要验证GPS距离
+                guard let nfcUuid = self.currentNfcUuid, !nfcUuid.isEmpty else {
+                    Logger.error("❌ NFC UUID is empty")
+                    return
+                }
+                
+                guard let selectedBuilding = self.selectedTreasure else {
+                    Logger.error("❌ No building selected")
+                    return
+                }
+                
+                // 异步验证GPS距离
+                Task {
+                    do {
+                        // 获取NFC的第一条注册记录（包含GPS信息）
+                        let firstCheckIn = try await BuildingCheckInManager.shared.getFirstCheckInByNFC(nfcUuid: nfcUuid)
+                        
+                        await MainActor.run {
+                            if let firstCheckIn = firstCheckIn,
+                               let nfcLat = firstCheckIn.gpsLatitude,
+                               let nfcLon = firstCheckIn.gpsLongitude {
+                                // NFC已注册，检查GPS距离
+                                let nfcRegisteredCoord = CLLocationCoordinate2D(latitude: nfcLat, longitude: nfcLon)
+                                let buildingCoord = selectedBuilding.coordinate
+                                let distance = self.calculateDistance(from: nfcRegisteredCoord, to: buildingCoord)
+                                
+                                Logger.location("📍 GPS距离验证（建筑扫描模式）:")
+                                Logger.debug("   当前建筑: \(selectedBuilding.name)")
+                                Logger.debug("   建筑GPS: (\(buildingCoord.latitude), \(buildingCoord.longitude))")
+                                Logger.debug("   NFC注册GPS: (\(nfcLat), \(nfcLon))")
+                                Logger.debug("   距离: \(String(format: "%.2f", distance)) 米")
+                                Logger.debug("   阈值: 40.0 米")
+                                
+                                if distance > 40.0 {
+                                    // 距离超过40米，显示GPS不匹配警告
+                                    Logger.error("❌ GPS距离不匹配！距离 \(String(format: "%.2f", distance))m > 40m")
+                                    Logger.error("   显示GPS错误提示...")
+                                    self.showGPSError = true
+                                } else {
+                                    // 距离在40米内，显示历史记录
+                                    Logger.success("✅ GPS距离匹配！距离 \(String(format: "%.2f", distance))m ≤ 40m")
+                                    Logger.success("📋 [Building Scan] 显示历史记录界面（在地图内部）")
+                                    Logger.debug("   传递的 nfcUuid: '\(self.currentNfcUuid ?? "nil")'")
+                                    self.showBuildingHistory = true  // 使用专用状态，避免触发fullScreenCover
+                                }
+                            } else {
+                                // NFC未注册（第一次扫描），直接显示历史记录（空列表）
+                                Logger.warning("⚠️ NFC未注册，这是第一次扫描")
+                                Logger.success("📋 [Building Scan] 显示历史记录界面（在地图内部）")
+                                Logger.debug("   传递的 nfcUuid: '\(self.currentNfcUuid ?? "nil")'")
+                                self.showBuildingHistory = true  // 使用专用状态，避免触发fullScreenCover
+                            }
+                        }
+                    } catch {
+                        Logger.error("❌ 获取NFC第一条记录失败: \(error.localizedDescription)")
+                        // 出错时，直接显示历史记录（容错处理）
+                        await MainActor.run {
+                            Logger.warning("⚠️ 由于错误，跳过GPS验证，直接显示历史记录")
+                            self.showBuildingHistory = true
+                        }
+                    }
+                }
             }
         }
         
         nfcManager.onNFCError = { error in
-            Logger.error("NFC Error in direct scan: \(error)")
+            Logger.error("NFC Error in direct scan from building: \(error)")
             // 可以在这里显示错误提示
         }
     }
@@ -3053,38 +3720,99 @@ struct ContentView: View {
         return location1.distance(from: location2)
     }
     
+    // 根据GPS坐标查找最近的建筑（用于导航功能）
+    private func findNearestBuilding(latitude: Double, longitude: Double) -> Treasure? {
+        let targetLocation = CLLocation(latitude: latitude, longitude: longitude)
+        
+        // 查找距离最近的建筑
+        var nearestBuilding: Treasure? = nil
+        var minDistance: CLLocationDistance = Double.infinity
+        
+        for building in treasures {
+            let buildingLocation = CLLocation(latitude: building.coordinate.latitude, longitude: building.coordinate.longitude)
+            let distance = targetLocation.distance(from: buildingLocation)
+            
+            if distance < minDistance {
+                minDistance = distance
+                nearestBuilding = building
+            }
+        }
+        
+        Logger.debug("📍 最近的建筑: \(nearestBuilding?.name ?? "nil"), 距离: \(String(format: "%.2f", minDistance))m")
+        
+        // 如果最近的建筑距离超过100米，可能不是正确的建筑
+        if minDistance > 100 {
+            Logger.warning("⚠️ 最近的建筑距离超过100米，可能不准确")
+        }
+        
+        return nearestBuilding
+    }
+    
     // 处理Check-in完成，检查GPS坐标匹配
     private func handleCheckInCompletion(for building: Treasure) {
         Logger.debug("Current showCheckInInputModal state: \(showCheckInInputModal)")
         
-        // 检查GPS坐标匹配
-        if let nfcCoord = nfcCoordinate {
-            let distance = calculateDistance(from: nfcCoord, to: building.coordinate)
-            Logger.location("GPS Coordinate Check for Check-out:")
-            Logger.debug("   Target Building: \(building.name)")
-            Logger.debug("   Building Coordinate: \(building.coordinate)")
-            Logger.debug("   NFC Tag Coordinate: \(nfcCoord)")
-            Logger.debug("   Distance: \(String(format: "%.2f", distance)) meters")
-            Logger.debug("   Threshold: 10.0 meters")
-            
-            if distance < 10.0 {
-                // GPS坐标匹配，保存check-in数据
-                Logger.success("GPS coordinates MATCH! Distance \(String(format: "%.2f", distance))m < 10m")
-                Logger.success("Proceeding to save check-in data...")
-                saveCheckInData(for: building)
-                closeCheckInModal()
-            } else {
-                // GPS坐标不匹配，显示错误提示
-                Logger.error("GPS coordinates MISMATCH! Distance \(String(format: "%.2f", distance))m >= 10m")
-                Logger.error("Showing GPS mismatch error modal...")
-                showGPSErrorModal()
+        // 异步检查这个建筑是否已有check-in记录
+        Task {
+            do {
+                // 检查建筑是否已有历史记录
+                let existingCheckIns = try await BuildingCheckInManager.shared.getCheckIns(for: building.id)
+                let isFirstRegistration = existingCheckIns.isEmpty
+                
+                await MainActor.run {
+                    if isFirstRegistration {
+                        // 🆕 第一次注册，跳过GPS检查，直接保存
+                        Logger.success("🆕 这是该建筑的第一次NFC注册，跳过GPS距离检查")
+                        Logger.debug("   Building: \(building.name)")
+                        Logger.debug("   Building ID: \(building.id)")
+                        Logger.debug("   直接保存数据...")
+                        
+                        saveCheckInData(for: building)
+                        closeCheckInModal()
+                    } else {
+                        // 已有记录，需要进行GPS验证
+                        Logger.debug("📋 该建筑已有 \(existingCheckIns.count) 条历史记录，需要进行GPS验证")
+                        
+                        // 检查GPS坐标匹配
+                        if let nfcCoord = nfcCoordinate {
+                            let distance = calculateDistance(from: nfcCoord, to: building.coordinate)
+                            Logger.location("GPS Coordinate Check for Check-out:")
+                            Logger.debug("   Target Building: \(building.name)")
+                            Logger.debug("   Building Coordinate: \(building.coordinate)")
+                            Logger.debug("   NFC Tag Coordinate: \(nfcCoord)")
+                            Logger.debug("   Distance: \(String(format: "%.2f", distance)) meters")
+                            Logger.debug("   Threshold: 30.0 meters")
+                            
+                            if distance < 30.0 {
+                                // GPS坐标匹配，保存check-in数据
+                                Logger.success("GPS coordinates MATCH! Distance \(String(format: "%.2f", distance))m < 30m")
+                                Logger.success("Proceeding to save check-in data...")
+                                saveCheckInData(for: building)
+                                closeCheckInModal()
+                            } else {
+                                // GPS坐标不匹配，显示错误提示
+                                Logger.error("GPS coordinates MISMATCH! Distance \(String(format: "%.2f", distance))m >= 30m")
+                                Logger.error("Showing GPS mismatch error modal...")
+                                showGPSErrorModal()
+                            }
+                        } else {
+                            Logger.warning("NFC coordinate not available, proceeding without GPS check...")
+                            // 如果没有NFC坐标信息，直接保存数据
+                            saveCheckInData(for: building)
+                            closeCheckInModal()
+                        }
+                    }
+                }
+            } catch {
+                // 如果检查失败，记录错误并继续（默认跳过GPS检查）
+                Logger.error("❌ 检查建筑历史记录失败: \(error.localizedDescription)")
+                Logger.warning("⚠️ 由于检查失败，跳过GPS验证直接保存")
+                
+                await MainActor.run {
+                    saveCheckInData(for: building)
+                    closeCheckInModal()
+                }
             }
-        } else {
-            Logger.warning("NFC coordinate not available, proceeding without GPS check...")
-            Logger.warning("This should not happen in normal operation")
-            // 如果没有NFC坐标信息，直接保存数据
-            saveCheckInData(for: building)
-            closeCheckInModal()
         }
     }
     
@@ -3100,10 +3828,21 @@ struct ContentView: View {
     
     // 显示GPS错误模态框
     private func showGPSErrorModal() {
+        Logger.error("🚨 显示GPS错误模态框")
+        Logger.debug("当前状态 - showCheckInInputModal: \(showCheckInInputModal), showNavigation: \(showNavigation)")
+        Logger.debug("showGPSError当前值: \(showGPSError)")
+        
         withAnimation(.easeInOut(duration: 0.3)) {
             showCheckInInputModal = false
         }
-        currentSheetView = .nfcMismatchAlert
+        
+        // 使用DispatchQueue确保状态更新
+        DispatchQueue.main.async {
+            self.showGPSError = true
+            Logger.success("✅ showGPSError已设置为true")
+            Logger.debug("showGPSError设置后值: \(self.showGPSError)")
+        }
+        
         nfcManager.reset()
     }
 
@@ -3111,28 +3850,51 @@ struct ContentView: View {
     private func saveCheckInData(for building: Treasure) {
         Logger.database("Saving check-in data for building: \(building.name)")
         
-        // 创建Check-in记录
+        // ⚠️ 重要：立即保存这些值，因为 nfcManager.reset() 可能在 Task 完成前被调用
         let displayUsername = username.isEmpty ? "Guest" : username
-        let checkInRecord = CheckInRecord(
-            username: displayUsername,
-            timestamp: Date(),
-            ovalOfficeVM.assetName: ovalOfficeVM.assetName,
-            description: ovalOfficeVM.assetDescription,
-            image: ovalOfficeVM.assetImage
-        )
+        let savedNfcUuid = nfcManager.assetUUID.isEmpty ? nil : nfcManager.assetUUID
+        let savedAssetName = ovalOfficeVM.assetName.isEmpty ? nil : ovalOfficeVM.assetName
+        let savedDescription = ovalOfficeVM.assetDescription
+        let savedImage = ovalOfficeVM.assetImage
+        let savedLatitude = locationManager.location?.coordinate.latitude
+        let savedLongitude = locationManager.location?.coordinate.longitude
         
-        // 这里可以保存到本地存储或发送到服务器
-        // 目前先打印日志确认数据
-        Logger.debug("Check-in Record:")
-        Logger.debug("   - Username: \(checkInRecord.username)")
-        Logger.debug("   - Asset: \(checkInRecord.ovalOfficeVM.assetName)")
-        Logger.debug("   - Description: \(checkInRecord.description)")
-        Logger.debug("   - Has Image: \(checkInRecord.image != nil)")
-        Logger.debug("   - Timestamp: \(checkInRecord.timestamp)")
+        // 调试：打印 NFC UUID 信息
+        Logger.debug("📍 NFC UUID 调试信息:")
+        Logger.debug("   nfcManager.assetUUID = '\(nfcManager.assetUUID)'")
+        Logger.debug("   isEmpty: \(nfcManager.assetUUID.isEmpty)")
+        Logger.debug("   保存的 NFC UUID 值: \(savedNfcUuid ?? "nil")")
         
-        // 可以在这里添加实际的保存逻辑，比如保存到UserDefaults或发送到服务器
-        // 例如：saveCheckInToLocalStorage(checkInRecord)
-        // 或者：sendCheckInToServer(checkInRecord)
+        // 保存到 Supabase
+        Task {
+            do {
+                let checkIn = try await BuildingCheckInManager.shared.saveCheckIn(
+                    buildingId: building.id,
+                    username: displayUsername,
+                    assetName: savedAssetName,
+                    description: savedDescription,
+                    image: savedImage,
+                    nfcUuid: savedNfcUuid,
+                    latitude: savedLatitude,
+                    longitude: savedLongitude
+                )
+                
+                Logger.success("✅ Check-in saved successfully!")
+                Logger.debug("   - Building: \(building.name)")
+                Logger.debug("   - Username: \(displayUsername)")
+                Logger.debug("   - Asset Name: \(savedAssetName ?? "nil")")
+                Logger.debug("   - NFC UUID: \(savedNfcUuid ?? "nil")")
+                Logger.debug("   - Check-in ID: \(checkIn.id)")
+                
+                // 清空输入
+                DispatchQueue.main.async {
+                    self.ovalOfficeVM.resetAssetInput()
+                }
+            } catch {
+                Logger.error("❌ Failed to save check-in: \(error.localizedDescription)")
+                // 可以在这里显示错误提示给用户
+            }
+        }
     }
     
     // 指南针功能 - 定位到用户位置
@@ -3282,10 +4044,34 @@ struct ContentView: View {
     
     // 执行实际的聚合更新（后台线程优化）
     private func performClusterUpdate() {
-        let zoomLevel = currentRegion.span.latitudeDelta
+        let newZoomLevel = currentRegion.span.latitudeDelta
+        let oldZoomLevel = currentZoomLevel
         let region = currentRegion
         let searchMode = isSearchMode
         let searchResults = self.searchResults
+        
+        // 计算缩放变化百分比
+        let zoomChangePercent = oldZoomLevel > 0 ? abs(newZoomLevel - oldZoomLevel) / oldZoomLevel : 0
+        
+        // 设置阈值：只有缩放变化超过5%时才认为是真正的缩放操作
+        // 小于5%的变化认为是平移或地图内部调整，保持当前聚合状态
+        let zoomThreshold = 0.05
+        
+        // 判断是否是真正的缩放操作
+        let isSignificantZoom = zoomChangePercent > zoomThreshold
+        
+        // 判断是放大还是缩小
+        let isZoomingIn = isSignificantZoom && (newZoomLevel < oldZoomLevel)  // span变小 = 放大
+        let isZoomingOut = isSignificantZoom && (newZoomLevel > oldZoomLevel)  // span变大 = 缩小
+        
+        // 注释掉频繁的调试日志
+        // if isZoomingIn {
+        //     Logger.debug("🔍 Zooming IN detected (span: \(String(format: "%.4f", oldZoomLevel)) → \(String(format: "%.4f", newZoomLevel)), change: \(String(format: "%.1f%%", zoomChangePercent * 100)))")
+        // } else if isZoomingOut {
+        //     Logger.debug("🔎 Zooming OUT detected (span: \(String(format: "%.4f", oldZoomLevel)) → \(String(format: "%.4f", newZoomLevel)), change: \(String(format: "%.1f%%", zoomChangePercent * 100)))")
+        // } else {
+        //     Logger.debug("📍 Panning detected (span change: \(String(format: "%.1f%%", zoomChangePercent * 100)) < \(String(format: "%.1f%%", zoomThreshold * 100)))")
+        // }
         
         // 在后台线程执行聚合计算，避免阻塞UI
         DispatchQueue.global(qos: .userInitiated).async {
@@ -3294,24 +4080,33 @@ struct ContentView: View {
             if searchMode && !searchResults.isEmpty {
                 // 搜索模式：只处理搜索结果
                 targetBuildings = searchResults
-                Logger.debug("Search mode: Processing \(searchResults.count) search results")
+                // Logger.debug("Search mode: Processing \(searchResults.count) search results")
             } else {
                 // 正常模式：处理当前可视区域内的建筑（扩展20%边界）
                 targetBuildings = self.filterBuildingsInRegion(region, expandBy: 1.2)
-                Logger.debug("Normal mode: Total buildings: \(self.treasures.count), Visible: \(targetBuildings.count)")
+                // Logger.debug("Normal mode: Total buildings: \(self.treasures.count), Visible: \(targetBuildings.count)")
             }
             
             // 在后台计算聚合
+            // 只有在真正的放大操作时才强制展开
+            // 平移操作时保持正常聚合逻辑，确保稳定性
             let newClusters = BuildingClusteringManager.shared.clusterBuildings(
                 targetBuildings,
-                zoomLevel: zoomLevel
+                zoomLevel: newZoomLevel,
+                forceExpand: isZoomingIn
             )
             
-            Logger.info("Clustered into \(newClusters.count) groups (zoom: \(String(format: "%.4f", zoomLevel)))")
+            if isZoomingIn {
+                Logger.info("🔍 Zoom IN: Clustered into \(newClusters.count) groups (zoom: \(String(format: "%.4f", newZoomLevel)))")
+            } else if isZoomingOut {
+                Logger.info("🔎 Zoom OUT: Clustered into \(newClusters.count) groups (zoom: \(String(format: "%.4f", newZoomLevel)))")
+            } else {
+                Logger.info("📍 Pan: Clustered into \(newClusters.count) groups (zoom: \(String(format: "%.4f", newZoomLevel)))")
+            }
             
             // 回到主线程更新UI
             DispatchQueue.main.async {
-                self.currentZoomLevel = zoomLevel
+                self.currentZoomLevel = newZoomLevel
                 
                 // 使用更平滑的spring动画，持续时间0.35秒
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
@@ -3492,6 +4287,22 @@ struct ContentView: View {
     }
 
     private func calculateRoute(from: CLLocationCoordinate2D, to: CLLocationCoordinate2D) {
+        // 计算直线距离
+        let fromLocation = CLLocation(latitude: from.latitude, longitude: from.longitude)
+        let toLocation = CLLocation(latitude: to.latitude, longitude: to.longitude)
+        let straightLineDistance = fromLocation.distance(from: toLocation)
+        
+        Logger.location("Calculating route - straight line distance: \(String(format: "%.2f", straightLineDistance))m")
+        
+        // 如果距离小于100米，不显示路径
+        if straightLineDistance < 100.0 {
+            Logger.info("🚶 Distance < 100m, skipping route calculation (too close)")
+            self.routePolyline = nil
+            self.routeDistanceMeters = nil
+            self.isRouting = false
+            return
+        }
+        
         let request = MKDirections.Request()
         request.transportType = .walking
         request.source = MKMapItem(placemark: MKPlacemark(coordinate: from))
@@ -3632,19 +4443,8 @@ struct ContentView: View {
             Color.white
                 .ignoresSafeArea()
             
-            // 居中显示的平面图
-            GeometryReader { geometry in
-                Image("OvalOfficePlan")
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .scaleEffect(ovalOfficeVM.ovalOfficeScale)
-                    .offset(ovalOfficeVM.ovalOfficeOffset)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .overlay(
-                        // 网格覆盖层
-                        GridOverlayView(scale: ovalOfficeVM.ovalOfficeScale, offset: ovalOfficeVM.ovalOfficeOffset)
-                    )
-            }
+            // 地图层
+            ovalOfficeMapLayer
             
             // 显示已注册的资产标记和处理点击事件
             GeometryReader { geometry in
@@ -3882,9 +4682,9 @@ struct ContentView: View {
         }
         .sheet(isPresented: $ovalOfficeVM.showAssetInputModal) {
             AssetInputModal(
-                ovalOfficeVM.assetName: $ovalOfficeVM.assetName,
-                ovalOfficeVM.assetImage: $ovalOfficeVM.assetImage,
-                ovalOfficeVM.assetDescription: $ovalOfficeVM.assetDescription,
+                assetName: $ovalOfficeVM.assetName,
+                assetImage: $ovalOfficeVM.assetImage,
+                assetDescription: $ovalOfficeVM.assetDescription,
                 appGreen: appGreen,
                 nfcManager: nfcManager,
                 onCancel: {
@@ -3905,11 +4705,25 @@ struct ContentView: View {
         }
         .overlay(
             // 资产信息框
-            ovalOfficeVM.showAssetInfoModal ? assetInfoModal : nil
+            ovalOfficeVM.showAssetInfoModal ? AssetInfoModalView(
+                viewModel: ovalOfficeVM,
+                currentInteractionIndex: $currentInteractionIndex,
+                selectedUserInteraction: $selectedUserInteraction,
+                showUserDetailModal: $showUserDetailModal,
+                nfcManager: nfcManager,
+                appGreen: appGreen,
+                username: username
+            ) : nil
         )
         .overlay(
             // 用户详细信息框
-            showUserDetailModal ? userDetailModal : nil
+            showUserDetailModal ? UserDetailModalView(
+                viewModel: ovalOfficeVM,
+                showUserDetailModal: $showUserDetailModal,
+                currentInteractionIndex: $currentInteractionIndex,
+                selectedUserInteraction: $selectedUserInteraction,
+                appGreen: appGreen
+            ) : nil
         )
         .overlay(
             // NFC已注册提示弹窗
@@ -3935,21 +4749,33 @@ struct ContentView: View {
                             self.ovalOfficeVM.officeAssets[index].image = self.ovalOfficeVM.assetImage
                             self.ovalOfficeVM.officeAssets[index].description = self.ovalOfficeVM.assetDescription
                             
-                            // 创建初始历史记录（注册时的信息）
-                            let displayUsername = self.username.isEmpty ? "Guest" : self.username
-                            let initialInteraction = UserInteraction(
-                                username: displayUsername,
-                                interactionTime: Date(),
-                                image: self.ovalOfficeVM.assetImage,
-                                ovalOfficeVM.assetName: self.ovalOfficeVM.assetName,
-                                description: self.ovalOfficeVM.assetDescription
-                            )
-                            self.ovalOfficeVM.officeAssets[index].userInteractions.append(initialInteraction)
-                            
                             // 保存到磁盘
                             self.quickSaveAsset(self.ovalOfficeVM.officeAssets[index])
                             
-                            Logger.success("Asset saved with initial history")
+                            // 创建初始历史记录（保存到云端）
+                            let displayUsername = self.username.isEmpty ? "Guest" : self.username
+                            let asset = self.ovalOfficeVM.officeAssets[index]
+                            let assetId = "asset_\(asset.coordinate.x)_\(asset.coordinate.y)"
+                            
+                            Task {
+                                do {
+                                    let _ = try await OvalOfficeCheckInManager.shared.saveCheckIn(
+                                        assetId: assetId,
+                                        gridX: asset.coordinate.x,
+                                        gridY: asset.coordinate.y,
+                                        username: displayUsername,
+                                        assetName: self.ovalOfficeVM.assetName,
+                                        description: self.ovalOfficeVM.assetDescription,
+                                        image: self.ovalOfficeVM.assetImage,
+                                        nfcUuid: asset.nfcUUID,
+                                        latitude: asset.latitude,
+                                        longitude: asset.longitude
+                                    )
+                                    Logger.success("✅ Initial check-in saved to cloud")
+                                } catch {
+                                    Logger.error("❌ Failed to save initial check-in: \(error.localizedDescription)")
+                                }
+                            }
                         }
                         // 关闭输入框
                         self.ovalOfficeVM.showAssetInputModal = false
@@ -3991,20 +4817,15 @@ struct ContentView: View {
                                 Logger.success("Asset name updated to: \(self.ovalOfficeVM.assetName)")
                             }
                             
-                            // 创建check-in历史记录
-                            let newInteraction = UserInteraction(
-                                username: displayUsername,
-                                interactionTime: Date(),
-                                image: self.ovalOfficeVM.assetImage,
-                                ovalOfficeVM.assetName: currentAssetName,
-                                description: self.ovalOfficeVM.assetDescription
-                            )
-                            self.ovalOfficeVM.officeAssets[index].userInteractions.append(newInteraction)
-                            
                             // 更新GPS坐标（每次check-in时更新当前位置）
+                            var currentLatitude: Double? = self.ovalOfficeVM.officeAssets[index].latitude
+                            var currentLongitude: Double? = self.ovalOfficeVM.officeAssets[index].longitude
+                            
                             if let location = self.locationManager.location {
                                 self.ovalOfficeVM.officeAssets[index].latitude = location.coordinate.latitude
                                 self.ovalOfficeVM.officeAssets[index].longitude = location.coordinate.longitude
+                                currentLatitude = location.coordinate.latitude
+                                currentLongitude = location.coordinate.longitude
                                 Logger.location("GPS坐标已更新: \(location.coordinate.latitude), \(location.coordinate.longitude)")
                             } else {
                                 Logger.warning("Unable to get current GPS location")
@@ -4013,12 +4834,33 @@ struct ContentView: View {
                             // 保存到磁盘
                             self.quickSaveAsset(self.ovalOfficeVM.officeAssets[index])
                             
-                            Logger.success("Check-in saved to disk")
-                            Logger.debug("   - Username: \(displayUsername)")
-                            Logger.debug("   - Asset Name: \(currentAssetName)")
-                            Logger.debug("   - Description: \(self.ovalOfficeVM.assetDescription)")
-                            Logger.debug("   - Has Image: \(self.ovalOfficeVM.assetImage != nil)")
-                            Logger.debug("   - Total interactions: \(self.ovalOfficeVM.officeAssets[index].userInteractions.count)")
+                            // 保存 Check-in 到云端
+                            let asset = self.ovalOfficeVM.officeAssets[index]
+                            let assetId = "asset_\(asset.coordinate.x)_\(asset.coordinate.y)"
+                            
+                            Task {
+                                do {
+                                    let _ = try await OvalOfficeCheckInManager.shared.saveCheckIn(
+                                        assetId: assetId,
+                                        gridX: asset.coordinate.x,
+                                        gridY: asset.coordinate.y,
+                                        username: displayUsername,
+                                        assetName: currentAssetName,
+                                        description: self.ovalOfficeVM.assetDescription,
+                                        image: self.ovalOfficeVM.assetImage,
+                                        nfcUuid: asset.nfcUUID,
+                                        latitude: currentLatitude,
+                                        longitude: currentLongitude
+                                    )
+                                    Logger.success("✅ Check-in saved to cloud")
+                                    Logger.debug("   - Username: \(displayUsername)")
+                                    Logger.debug("   - Asset Name: \(currentAssetName)")
+                                    Logger.debug("   - Description: \(self.ovalOfficeVM.assetDescription)")
+                                    Logger.debug("   - Has Image: \(self.ovalOfficeVM.assetImage != nil)")
+                                } catch {
+                                    Logger.error("❌ Failed to save check-in: \(error.localizedDescription)")
+                                }
+                            }
                         }
                         
                         // 关闭输入框
@@ -4061,451 +4903,22 @@ struct ContentView: View {
         }
     }
     
-    // 资产信息框视图
-    private var assetInfoModal: some View {
-        ZStack {
-            // 半透明背景
-            Color.black.opacity(0.4)
-                .ignoresSafeArea()
-                .onTapGesture {
-                    ovalOfficeVM.showAssetInfoModal = false
-                }
-            
-            // 信息框
-            VStack(spacing: 0) {
-                // 标题栏
-                HStack {
-                    Text("Asset's History")
-                        .font(.headline)
-                        .fontWeight(.bold)
-                        .foregroundColor(.primary)
-                    
-                    Spacer()
-                    
-                    // 关闭按钮
-                    Button(action: {
-                        ovalOfficeVM.showAssetInfoModal = false
-                    }) {
-                        Image(systemName: "xmark")
-                            .font(.title3)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 20)
-                .padding(.bottom, 16)
-                
-                // Asset基本信息（包含Asset名称和GPS坐标）
-                if let asset = ovalOfficeVM.selectedAssetInfo,
-                   let index = ovalOfficeVM.officeAssets.firstIndex(where: { $0.coordinate.x == asset.coordinate.x && $0.coordinate.y == asset.coordinate.y }) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        // Asset名称
-                        if !ovalOfficeVM.officeAssets[index].name.isEmpty {
-                            HStack(spacing: 6) {
-                                Image(systemName: "tag.fill")
-                                    .font(.caption)
-                                    .foregroundColor(.blue)
-                                Text(ovalOfficeVM.officeAssets[index].name)
-                                    .font(.subheadline)
-                                    .fontWeight(.semibold)
-                            }
-                        }
-                        
-                        // GPS坐标
-                        if ovalOfficeVM.officeAssets[index].hasGPSCoordinates {
-                            HStack(spacing: 6) {
-                                Image(systemName: "location.fill")
-                                    .font(.caption)
-                                    .foregroundColor(.green)
-                                Text("GPS: \(ovalOfficeVM.officeAssets[index].gpsCoordinatesString)")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                        } else {
-                            HStack(spacing: 6) {
-                                Image(systemName: "location.slash")
-                                    .font(.caption)
-                                    .foregroundColor(.gray)
-                                Text("GPS: Not available")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                    }
-                    .padding(12)
-                    .background(Color(.systemGray6))
-                    .cornerRadius(8)
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 12)
-                }
-                
-                // 历史记录标题
-                Text("Check-in History")
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 8)
-                
-                // 用户互动列表
-                ScrollView {
-                    LazyVStack(spacing: 12) {
-                        // 显示真实的历史记录
-                        if let asset = ovalOfficeVM.selectedAssetInfo,
-                           let index = ovalOfficeVM.officeAssets.firstIndex(where: { $0.coordinate.x == asset.coordinate.x && $0.coordinate.y == asset.coordinate.y }) {
-                            let interactions = ovalOfficeVM.officeAssets[index].userInteractions
-                            
-                            if interactions.isEmpty {
-                                // 如果没有历史记录，显示提示
-                                VStack(spacing: 12) {
-                                    Image(systemName: "clock.arrow.circlepath")
-                                        .font(.system(size: 50))
-                                        .foregroundColor(.gray.opacity(0.5))
-                                    Text("No check-in history yet")
-                                        .font(.subheadline)
-                                        .foregroundColor(.secondary)
-                                    Text("Be the first to check in!")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 40)
-                            } else {
-                                // 显示历史记录（按时间倒序）
-                                ForEach(Array(interactions.reversed().enumerated()), id: \.element.id) { index, interaction in
-                                    UserInteractionRow(
-                                        interaction: interaction,
-                                        onTap: {
-                                            // 设置当前查看的索引（在倒序数组中的索引）
-                                            currentInteractionIndex = index
-                                            selectedUserInteraction = interaction
-                                            showUserDetailModal = true
-                                        }
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 20)
-                }
-                .padding(.bottom, 16)
-                
-                // Check in mine! 按钮
-                Button(action: {
-                    // 关闭历史信息框
-                    ovalOfficeVM.showAssetInfoModal = false
-                    
-                    // 设置当前资产为选中状态
-                    if let asset = ovalOfficeVM.selectedAssetInfo {
-                        // 找到资产在数组中的索引
-                        if let index = ovalOfficeVM.officeAssets.firstIndex(where: { $0.coordinate.x == asset.coordinate.x && $0.coordinate.y == asset.coordinate.y }) {
-                            ovalOfficeVM.selectedAssetIndex = index
-                            
-                            // 检查Asset是否有NFC UUID
-                            let assetNFCUUID = ovalOfficeVM.officeAssets[index].nfcUUID
-                            
-                            if assetNFCUUID.isEmpty {
-                                Logger.warning("Asset has no NFC UUID, cannot check in")
-                                // 可以显示一个提示，或者允许无NFC check-in
-                                // 这里直接显示输入框（向后兼容没有NFC的Asset）
-                                ovalOfficeVM.assetName = ""
-                                ovalOfficeVM.assetImage = nil
-                                ovalOfficeVM.assetDescription = ""
-                                ovalOfficeVM.isNewAsset = false
-                                ovalOfficeVM.showAssetInputModal = true
-                            } else {
-                                Logger.debug("Starting NFC check-in first scan for Asset with UUID: \(assetNFCUUID)")
-                                // 启动第一次NFC扫描验证
-                                nfcManager.startCheckInFirstScan(expectedUUID: assetNFCUUID)
-                            }
-                        }
-                    }
-                }) {
-                    Text("Check in mine!")
-                        .font(.headline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(appGreen)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background {
-                            ZStack {
-                                Color.clear.background(.ultraThinMaterial)
-                                LinearGradient(
-                                    gradient: Gradient(colors: [
-                                        appGreen.opacity(0.15),
-                                        appGreen.opacity(0.05)
-                                    ]),
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            }
-                        }
-                        .cornerRadius(12)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .strokeBorder(
-                                    LinearGradient(
-                                        gradient: Gradient(stops: [
-                                            .init(color: Color.white.opacity(0.6), location: 0.0),
-                                            .init(color: Color.white.opacity(0.0), location: 0.3),
-                                            .init(color: appGreen.opacity(0.2), location: 0.7),
-                                            .init(color: appGreen.opacity(0.4), location: 1.0)
-                                        ]),
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    ),
-                                    lineWidth: 1.5
-                                )
-                        )
-                        .shadow(color: appGreen.opacity(0.2), radius: 8, x: 0, y: 4)
-                        .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
-                }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 20)
-            }
-            .background(Color(.systemBackground))
-            .cornerRadius(16)
-            .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 5)
-            .padding(.horizontal, 20)
-            .frame(maxHeight: 700)
+    // 地图图层
+    private var ovalOfficeMapLayer: some View {
+        GeometryReader { geometry in
+            Image("OvalOfficePlan")
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .scaleEffect(ovalOfficeVM.ovalOfficeScale)
+                .offset(ovalOfficeVM.ovalOfficeOffset)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .overlay(
+                    GridOverlayView(scale: ovalOfficeVM.ovalOfficeScale, offset: ovalOfficeVM.ovalOfficeOffset)
+                )
         }
     }
     
-    // 用户互动行视图
-    private func UserInteractionRow(interaction: UserInteraction, onTap: @escaping () -> Void) -> some View {
-        Button(action: {
-            onTap()
-        }) {
-            VStack(alignment: .leading, spacing: 8) {
-                // 用户名和时间
-                HStack {
-                    Text(interaction.username)
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.primary)
-                    
-                    Spacer()
-                    
-                    Text(interaction.interactionTime, style: .relative)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                
-                // Asset名称（粗体显示）
-                if !interaction.ovalOfficeVM.assetName.isEmpty {
-                    Text(interaction.ovalOfficeVM.assetName)
-                        .font(.body)
-                        .fontWeight(.bold)
-                        .foregroundColor(.primary)
-                }
-                
-                // 描述内容
-                if !interaction.description.isEmpty {
-                    Text(interaction.description)
-                        .font(.body)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.leading)
-                        .lineLimit(2)
-                }
-                
-                // 图片预览（如果有）
-                if let image = interaction.image {
-                    Image(uiImage: image)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(height: 80)
-                        .clipped()
-                        .cornerRadius(8)
-                }
-            }
-            .padding(12)
-            .background(Color.gray.opacity(0.1))
-            .cornerRadius(8)
-        }
-        .buttonStyle(PlainButtonStyle())
-    }
-    
-    // 用户详细信息框
-    private var userDetailModal: some View {
-        ZStack {
-            // 半透明背景
-            Color.black.opacity(0.4)
-                .ignoresSafeArea()
-                .onTapGesture {
-                    showUserDetailModal = false
-                }
-            
-            // 详细信息框
-            VStack(spacing: 0) {
-                // 标题栏
-                VStack(spacing: 8) {
-                    HStack {
-                        Text("Check-in Details")
-                            .font(.headline)
-                            .fontWeight(.bold)
-                            .foregroundColor(.primary)
-                        
-                        Spacer()
-                        
-                        // 关闭按钮
-                        Button(action: {
-                            showUserDetailModal = false
-                        }) {
-                            Image(systemName: "xmark")
-                                .font(.title3)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    
-                    // 导航按钮 - 在当前Asset的历史记录中前后翻页
-                    if let asset = ovalOfficeVM.selectedAssetInfo,
-                       let assetIndex = ovalOfficeVM.officeAssets.firstIndex(where: { $0.coordinate.x == asset.coordinate.x && $0.coordinate.y == asset.coordinate.y }) {
-                        let interactions = ovalOfficeVM.officeAssets[assetIndex].userInteractions.reversed()
-                        let totalCount = interactions.count
-                        
-                        if totalCount > 1 {
-                            HStack {
-                                Spacer()
-                                
-                                // 上一个按钮
-                                Button(action: {
-                                    if currentInteractionIndex > 0 {
-                                        currentInteractionIndex -= 1
-                                        selectedUserInteraction = Array(interactions)[currentInteractionIndex]
-                                    }
-                                }) {
-                                    Image(systemName: "chevron.left")
-                                        .font(.title3)
-                                        .foregroundColor(currentInteractionIndex > 0 ? .primary : .gray)
-                                        .frame(width: 30, height: 30)
-                                        .background(Color.gray.opacity(0.1))
-                                        .cornerRadius(15)
-                                }
-                                .disabled(currentInteractionIndex <= 0)
-                                
-                                // 页数指示
-                                Text("\(currentInteractionIndex + 1) / \(totalCount)")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                    .padding(.horizontal, 12)
-                                
-                                // 下一个按钮
-                                Button(action: {
-                                    if currentInteractionIndex < totalCount - 1 {
-                                        currentInteractionIndex += 1
-                                        selectedUserInteraction = Array(interactions)[currentInteractionIndex]
-                                    }
-                                }) {
-                                    Image(systemName: "chevron.right")
-                                        .font(.title3)
-                                        .foregroundColor(currentInteractionIndex < totalCount - 1 ? .primary : .gray)
-                                        .frame(width: 30, height: 30)
-                                        .background(Color.gray.opacity(0.1))
-                                        .cornerRadius(15)
-                                }
-                                .disabled(currentInteractionIndex >= totalCount - 1)
-                            }
-                        }
-                    }
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 20)
-                .padding(.bottom, 16)
-                
-                // 用户详细信息
-                if let interaction = selectedUserInteraction {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 16) {
-                            // 用户名和时间
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Username")
-                                    .font(.subheadline)
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(.secondary)
-                                
-                                Text(interaction.username)
-                                    .font(.title2)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.primary)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                            }
-                            
-                            // 互动时间
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Interaction Time")
-                                    .font(.subheadline)
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(.secondary)
-                                
-                                Text(interaction.interactionTime, style: .date)
-                                    .font(.body)
-                                    .foregroundColor(.primary)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                            }
-                            
-                            // Asset名称
-                            if !interaction.ovalOfficeVM.assetName.isEmpty {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    Text("Asset Name")
-                                        .font(.subheadline)
-                                        .fontWeight(.semibold)
-                                        .foregroundColor(.secondary)
-                                    
-                                    Text(interaction.ovalOfficeVM.assetName)
-                                        .font(.title3)
-                                        .fontWeight(.bold)
-                                        .foregroundColor(appGreen)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                }
-                            }
-                            
-                            // 图片（如果有）
-                            if let image = interaction.image {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    Text("Photo")
-                                        .font(.subheadline)
-                                        .fontWeight(.semibold)
-                                        .foregroundColor(.secondary)
-                                    
-                                    Image(uiImage: image)
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fit)
-                                        .frame(maxHeight: 300)
-                                        .cornerRadius(12)
-                                }
-                            }
-                            
-                            // 描述内容
-                            if !interaction.description.isEmpty {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    Text("Description")
-                                        .font(.subheadline)
-                                        .fontWeight(.semibold)
-                                        .foregroundColor(.secondary)
-                                    
-                                    Text(interaction.description)
-                                        .font(.body)
-                                        .foregroundColor(.primary)
-                                        .multilineTextAlignment(.leading)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                }
-                            }
-                        }
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, 20)
-                    }
-                }
-                
-                Spacer()
-            }
-            .background(Color(.systemBackground))
-            .cornerRadius(16)
-            .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 5)
-            .padding(.horizontal, 20)
-            .frame(maxHeight: 600)
-        }
-    }
+    // AssetInfoModalView, UserInteractionRow, UserDetailModalView 已移到 Views/OvalOffice/AssetInfoModalView.swift
     
     // NFC已注册提示弹窗
     private var nfcAlreadyRegisteredAlert: some View {
@@ -4519,7 +4932,7 @@ struct ContentView: View {
                 // 图标
                 Image(systemName: "exclamationmark.triangle.fill")
                     .font(.system(size: 60))
-                    .foregroundColor(.orange)
+                    .foregroundColor(appGreen)
                     .padding(.top, 20)
                 
                 // 标题
@@ -4615,6 +5028,56 @@ struct ContentView: View {
         }
     }
     
+    // 我的历史记录全屏视图
+    private var myHistoryFullScreenView: some View {
+        MyHistoryFullScreenView(
+            username: username,
+            appGreen: appGreen,
+            onClose: {
+                Logger.debug("MyHistory close button tapped")
+                showMyHistory = false
+                // 关闭历史记录后重新打开地图
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    showMap = true
+                }
+            },
+            onNavigateToBuilding: { latitude, longitude in
+                Logger.debug("📍 导航到GPS坐标: (\(latitude), \(longitude))")
+                
+                // 根据GPS坐标查找最近的建筑
+                if let building = findNearestBuilding(latitude: latitude, longitude: longitude) {
+                    Logger.success("✅ 找到建筑: \(building.name)")
+                    
+                    // 关闭历史记录界面
+                    showMyHistory = false
+                    
+                    // 延迟打开地图并启动导航
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        selectedTreasure = building
+                        showMap = true
+                        showNavigation = true
+                    }
+                } else {
+                    Logger.warning("⚠️ 未找到对应的建筑")
+                }
+            },
+            onNavigateToOvalOffice: {
+                Logger.debug("📍 导航到Oval Office（从My History）")
+                
+                // 关闭历史记录界面
+                showMyHistory = false
+                
+                // 延迟打开Oval Office
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    ovalOfficeVM.showOvalOffice = true
+                }
+            }
+        )
+        .onAppear {
+            Logger.debug("✅ MyHistoryFullScreenView appeared!")
+        }
+    }
+    
     // MARK: - Body
     var body: some View {
         contentWithModifiers
@@ -4623,202 +5086,14 @@ struct ContentView: View {
             }
             .fullScreenCover(isPresented: $showMap) {
                 fullScreenMapView
-        }
+            }
+            .fullScreenCover(isPresented: $showMyHistory) {
+                myHistoryFullScreenView
+            }
     }
 }
 
-// Asset信息输入弹窗组件
-struct AssetInputModal: View {
-    @Binding var assetName: String
-    @Binding var assetImage: UIImage?
-    @Binding var assetDescription: String
-    let appGreen: Color
-    @ObservedObject var nfcManager: NFCManager
-    let onCancel: () -> Void
-    
-    @State private var showingImagePicker = false
-    @State private var showingCamera = false
-    @State private var sourceType: UIImagePickerController.SourceType = .photoLibrary
-    @State private var showCameraUnavailableAlert = false
-    @State private var displayTitle: String = "Asset Information"
-    @State private var displayInputText: String = "INPUT"
-    @State private var showingPhotoOptions = false
-    
-    var body: some View {
-        NavigationView {
-            VStack(spacing: 0) {
-                // 标题区域
-                VStack(spacing: 16) {
-                    Text(displayTitle)
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.primary)
-                        .padding(.top, 20)
-                        .padding(.bottom, 8)
-                }
-                
-                // 主要内容区域
-                ScrollView {
-                    VStack(spacing: 16) {  // 减少主VStack间距
-                        // 名称输入框
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Asset Name")
-                                .font(.headline)
-                                .foregroundColor(.primary)
-                            
-                            TextField("max 8 characters", text: $ovalOfficeVM.assetName)
-                                .textFieldStyle(RoundedBorderTextFieldStyle())
-                                .font(.body)
-                                .onChange(of: ovalOfficeVM.assetName) { _, newValue in
-                                    if newValue.count > 8 {
-                                        ovalOfficeVM.assetName = String(newValue.prefix(8))
-                                    }
-                                }
-                        }
-                        
-                        // 照片上传/拍摄
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Photo")
-                                .font(.headline)
-                                .foregroundColor(.primary)
-                            
-                            // 可点击的照片框，占据整个宽度
-                            Button(action: {
-                                showingPhotoOptions = true
-                            }) {
-                                if let image = ovalOfficeVM.assetImage {
-                                    Image(uiImage: image)
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fill)
-                                        .frame(maxWidth: .infinity, minHeight: 200, maxHeight: 300)
-                                        .clipped()
-                                        .cornerRadius(12)
-                                        .shadow(color: .gray.opacity(0.3), radius: 4, x: 0, y: 2)
-                                } else {
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .fill(Color.gray.opacity(0.2))
-                                        .frame(maxWidth: .infinity, minHeight: 200, maxHeight: 300)
-                                        .overlay(
-                                            VStack(spacing: 12) {
-                                                Image(systemName: "photo")
-                                                    .font(.system(size: 40))
-                                                    .foregroundColor(.gray)
-                                                Text("Tap to add photo")
-                                                    .font(.headline)
-                                                    .foregroundColor(.gray)
-                                            }
-                                        )
-                                        .shadow(color: .gray.opacity(0.3), radius: 4, x: 0, y: 2)
-                                }
-                            }
-                            .buttonStyle(.plain)
-                        }
-                        
-                        // 文字描述输入框
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Description")
-                                .font(.headline)
-                                .foregroundColor(.primary)
-                            
-                            TextField("Enter description", text: $ovalOfficeVM.assetDescription, axis: .vertical)
-                                .textFieldStyle(RoundedBorderTextFieldStyle())
-                                .font(.body)
-                                .lineLimit(6...12)
-                                .frame(minHeight: 120)
-                        }
-                        .padding(.top, 12)  // 确保与Photo标题和照片框之间的间距一致
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 8)
-                    .padding(.bottom, 120)
-                }
-                
-                // 底部按钮区域
-                VStack(spacing: 0) {
-                    Divider()
-                        .padding(.horizontal, 20)
-                    
-                    HStack(spacing: 16) {
-                        // 注册模式和Check-in模式都显示"TAP NFC again to Check out"按钮
-                        Button("TAP NFC again to Check out") {
-                            // 根据当前阶段触发不同的NFC扫描
-                            if nfcManager.currentPhase == .checkInInput {
-                                // Check-in模式：触发第二次check-in扫描
-                                nfcManager.startCheckInSecondScan()
-                            } else {
-                                // 注册模式：触发第二次注册扫描
-                                nfcManager.startSecondScan()
-                            }
-                        }
-                        .font(.headline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(appGreen)
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                        .background {
-                            ZStack {
-                                Color.clear.background(.ultraThinMaterial)
-                                appGreen.opacity(0.1)
-                            }
-                        }
-                        .cornerRadius(8)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(appGreen.opacity(0.3), lineWidth: 1)
-                        )
-                        .disabled(nfcManager.currentPhase == .secondScan || nfcManager.currentPhase == .checkInSecondScan)
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 16)
-                }
-                .background(Color(.systemBackground))
-            }
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("×") {
-                        onCancel()
-                    }
-                    .font(.title2)
-                    .foregroundColor(.primary)
-                }
-            }
-        }
-        .sheet(isPresented: $showingImagePicker) {
-            ImagePicker(image: $ovalOfficeVM.assetImage, sourceType: sourceType)
-        }
-        .sheet(isPresented: $showingCamera) {
-            ImagePicker(image: $ovalOfficeVM.assetImage, sourceType: sourceType)
-        }
-        .actionSheet(isPresented: $showingPhotoOptions) {
-            ActionSheet(
-                title: Text("Select Photo"),
-                buttons: [
-                    .default(Text("Upload Photo")) {
-                        sourceType = .photoLibrary
-                        showingImagePicker = true
-                    },
-                    .default(Text("Take Photo")) {
-                        if UIImagePickerController.isSourceTypeAvailable(.camera) {
-                            sourceType = .camera
-                            showingCamera = true
-                        } else {
-                            showCameraUnavailableAlert = true
-                        }
-                    },
-                    .cancel(Text("Cancel"))
-                ]
-            )
-        }
-        .alert("Camera Unavailable", isPresented: $showCameraUnavailableAlert) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text("Your device camera is not available or permission is restricted.")
-        }
-        .onAppear {
-            // 初始化显示标题
-            displayTitle = ovalOfficeVM.assetName.isEmpty ? "Asset Information" : ovalOfficeVM.assetName
-        }
-    }
-}
+// AssetInputModal 已移到 Views/OvalOffice/AssetInputModalView.swift
 
 // 图片选择器组件
 // 交通方式选择视图
@@ -5065,56 +5340,120 @@ struct NFCScanView: View {
 struct AssetHistoryView: View {
     let targetBuilding: Treasure?
     let nfcCoordinate: CLLocationCoordinate2D?
+    let nfcUuid: String? // 新增：NFC UUID
     let onBackToNavigation: () -> Void
     let onShowNFCMismatch: () -> Void
     let onStartCheckIn: (String) -> Void // 启动Check-in的回调
     
+    @State private var isFirstRegistration: Bool = false
+    @State private var isCheckingHistory: Bool = true
+    
     var body: some View {
-        ZStack {
-            // 半透明背景
-            Color.black.opacity(0.4)
-                .ignoresSafeArea()
-                .onTapGesture {
-                    onBackToNavigation()
-                }
-            
-            // 检查坐标匹配
+        // 检查坐标匹配
+        Group {
             if let building = targetBuilding, let nfcCoord = nfcCoordinate {
-                if isCoordinateMatch(building: building, nfcCoordinate: nfcCoord) {
-                    // 坐标匹配，显示正常的历史信息框
+                // 调试日志
+                let _ = {
+                    Logger.debug("🔍 AssetHistoryView 显示逻辑判断:")
+                    Logger.debug("   isCheckingHistory: \(isCheckingHistory)")
+                    Logger.debug("   isFirstRegistration: \(isFirstRegistration)")
+                }()
+                
+                if isCheckingHistory {
+                    // 正在检查历史记录
+                    VStack(spacing: 16) {
+                        ProgressView()
+                            .scaleEffect(1.5)
+                        Text("Checking history...")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color.black.opacity(0.3))
+                } else if isFirstRegistration {
+                    // 🆕 第一次注册，跳过GPS检查，直接显示历史框
+                    let _ = Logger.success("✅ 显示历史框（第一次注册，已跳过GPS检查）")
                     AssetHistoryModal(
                         building: building, 
                         onBack: onBackToNavigation,
-                        onStartCheckIn: onStartCheckIn
+                        onStartCheckIn: onStartCheckIn,
+                        nfcUuid: nfcUuid
+                    )
+                } else if isCoordinateMatch(building: building, nfcCoordinate: nfcCoord) {
+                    // 坐标匹配，显示正常的历史信息框
+                    let _ = Logger.success("✅ 显示历史框（GPS坐标匹配）")
+                    AssetHistoryModal(
+                        building: building, 
+                        onBack: onBackToNavigation,
+                        onStartCheckIn: onStartCheckIn,
+                        nfcUuid: nfcUuid
                     )
                 } else {
                     // 坐标不匹配，显示错误信息
+                    let _ = Logger.error("❌ 显示GPS错误框（坐标不匹配）")
                     NFCErrorModal(onBack: onBackToNavigation)
                 }
             } else {
-                // 默认显示
+                // 探索模式：没有 targetBuilding，直接显示历史记录
+                let _ = Logger.debug("🔍 探索模式：targetBuilding = nil，直接显示历史记录")
                 AssetHistoryModal(
                     building: targetBuilding, 
                     onBack: onBackToNavigation,
-                    onStartCheckIn: onStartCheckIn
+                    onStartCheckIn: onStartCheckIn,
+                    nfcUuid: nfcUuid
                 )
+            }
+        }
+        .onAppear {
+            Logger.debug("🏛️ AssetHistoryView 已显示")
+            Logger.debug("   targetBuilding: \(targetBuilding?.name ?? "nil")")
+            Logger.debug("   nfcCoordinate: \(nfcCoordinate != nil ? "有坐标" : "nil")")
+            Logger.debug("   nfcUuid: \(nfcUuid ?? "nil")")
+            
+            // 检查是否为第一次注册
+            if let building = targetBuilding {
+                Task {
+                    do {
+                        let existingCheckIns = try await BuildingCheckInManager.shared.getCheckIns(for: building.id)
+                        await MainActor.run {
+                            isFirstRegistration = existingCheckIns.isEmpty
+                            isCheckingHistory = false
+                            
+                            if isFirstRegistration {
+                                Logger.success("🆕 第一次注册此建筑，跳过GPS距离检查")
+                            } else {
+                                Logger.debug("📋 建筑已有 \(existingCheckIns.count) 条记录，将进行GPS验证")
+                            }
+                        }
+                    } catch {
+                        Logger.error("❌ 检查历史记录失败: \(error.localizedDescription)")
+                        // 失败时默认跳过GPS检查
+                        await MainActor.run {
+                            isFirstRegistration = true
+                            isCheckingHistory = false
+                        }
+                    }
+                }
+            } else {
+                isCheckingHistory = false
             }
         }
     }
     
-    // 检查坐标是否匹配（距离小于10米）
+    // 检查坐标是否匹配（距离小于30米）
     private func isCoordinateMatch(building: Treasure, nfcCoordinate: CLLocationCoordinate2D) -> Bool {
         let buildingLocation = CLLocation(latitude: building.coordinate.latitude, longitude: building.coordinate.longitude)
         let nfcLocation = CLLocation(latitude: nfcCoordinate.latitude, longitude: nfcCoordinate.longitude)
         let distance = buildingLocation.distance(from: nfcLocation)
         
-        Logger.location("Coordinate match check:")
-        Logger.debug("   Building: \(building.coordinate)")
+        Logger.location("📍 Coordinate match check:")
+        Logger.debug("   Building: \(building.name) - \(building.coordinate)")
         Logger.debug("   NFC: \(nfcCoordinate)")
         Logger.debug("   Distance: \(String(format: "%.2f", distance)) meters")
-        Logger.debug("   Match: \(distance < 10.0 ? "✅ YES" : "❌ NO") (< 10m)")
+        Logger.debug("   isFirstRegistration: \(isFirstRegistration)")
+        Logger.debug("   Match: \(distance < 30.0 ? "✅ YES" : "❌ NO") (< 30m)")
         
-        return distance < 10.0 // 小于10米
+        return distance < 30.0 // 小于30米
     }
 }
 
@@ -5123,6 +5462,20 @@ struct AssetHistoryModal: View {
     let building: Treasure?
     let onBack: () -> Void
     let onStartCheckIn: (String) -> Void // 启动Check-in的回调
+    let nfcUuid: String? // 新增：NFC UUID，用于获取特定NFC的历史记录
+    
+    @State private var checkIns: [BuildingCheckIn] = []
+    @State private var ovalOfficeCheckIns: [OvalOfficeCheckIn] = []
+    @State private var isLoading = false
+    @State private var errorMessage: String?
+    
+    // 初始化方法
+    init(building: Treasure?, onBack: @escaping () -> Void, onStartCheckIn: @escaping (String) -> Void, nfcUuid: String? = nil) {
+        self.building = building
+        self.onBack = onBack
+        self.onStartCheckIn = onStartCheckIn
+        self.nfcUuid = nfcUuid
+    }
     
     var body: some View {
         // 信息框 - 使用与office map相同的样式
@@ -5177,8 +5530,50 @@ struct AssetHistoryModal: View {
             // 历史记录区域
             ScrollView {
                 VStack(spacing: 16) {
-                    ForEach(0..<5) { index in
-                        HistoryItemView(index: index)
+                    if isLoading {
+                        // 加载中
+                        ProgressView()
+                            .padding(.vertical, 40)
+                    } else if let error = errorMessage {
+                        // 错误提示
+                        VStack(spacing: 12) {
+                            Image(systemName: "exclamationmark.triangle")
+                                .font(.system(size: 50))
+                                .foregroundColor(appGreen.opacity(0.5))
+                            Text("Failed to load history")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                            Text(error)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                        }
+                        .padding(.vertical, 40)
+                    } else if checkIns.isEmpty && ovalOfficeCheckIns.isEmpty {
+                        // 无历史记录
+                        VStack(spacing: 12) {
+                            Image(systemName: "clock.arrow.circlepath")
+                                .font(.system(size: 50))
+                                .foregroundColor(.gray.opacity(0.5))
+                            Text("No check-in history yet")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                            Text("Be the first to check in!")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 40)
+                    } else {
+                        // 显示Building历史记录
+                        ForEach(checkIns) { checkIn in
+                            BuildingCheckInRow(checkIn: checkIn)
+                        }
+                        
+                        // 显示Oval Office历史记录
+                        ForEach(ovalOfficeCheckIns) { checkIn in
+                            OvalOfficeCheckInRow(checkIn: checkIn, appGreen: appGreen)
+                        }
                     }
                 }
                 .padding(.horizontal, 20)
@@ -5191,17 +5586,19 @@ struct AssetHistoryModal: View {
                 Divider()
                 
                 Button(action: {
-                    // 启动Check-in功能 - 先关闭Asset History，然后顺滑打开输入框
+                    // 启动Check-in功能 - 直接打开输入框，不关闭Asset History
                     if let building = building {
                         Logger.debug("Starting check-in for building: \(building.name)")
                         
-                        // 先关闭Asset History模态框
-                        onBack()
+                        // 直接启动Check-in，不需要延迟
+                        onStartCheckIn(building.id)
+                    } else {
+                        // 探索模式：没有 building，使用 NFC UUID 作为标识
+                        Logger.debug("🔍 探索模式：启动 Check-in（没有关联建筑）")
+                        Logger.debug("   NFC UUID: \(nfcUuid ?? "nil")")
                         
-                        // 延迟一点时间再显示输入框，实现顺滑过渡
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                            onStartCheckIn(building.id)
-                        }
+                        // 使用空字符串或特殊标识来表示这是探索模式的 check-in
+                        onStartCheckIn("")
                     }
                 }) {
                     Text("Check In Mine")
@@ -5249,6 +5646,194 @@ struct AssetHistoryModal: View {
         .background(Color(.systemBackground))
         .cornerRadius(16)
         .shadow(radius: 20)
+        .onAppear {
+            Logger.debug("🏛️ AssetHistoryModal 已显示")
+            Logger.debug("   building: \(building?.name ?? "nil")")
+            Logger.debug("   nfcUuid: \(nfcUuid ?? "nil")")
+            loadCheckIns()
+        }
+    }
+    
+    private func loadCheckIns() {
+        Logger.debug("📋 ========== 开始加载历史记录 ==========")
+        Logger.debug("📋 nfcUuid: '\(nfcUuid ?? "nil")'")
+        Logger.debug("📋 nfcUuid 长度: \(nfcUuid?.count ?? 0)")
+        Logger.debug("📋 building: \(building?.name ?? "nil")")
+        
+        isLoading = true
+        errorMessage = nil
+        
+        Task {
+            do {
+                var fetchedCheckIns: [BuildingCheckIn] = []
+                var fetchedOvalOfficeCheckIns: [OvalOfficeCheckIn] = []
+                
+                if let nfcUuid = nfcUuid {
+                    // 根据NFC UUID获取所有表的历史记录
+                    Logger.success("✅ 检测到 NFC UUID，将从两个表查询")
+                    Logger.debug("📋 查询的 NFC UUID: '\(nfcUuid)'")
+                    Logger.debug("📋 UUID 长度: \(nfcUuid.count) 字符")
+                    
+                    // 1. 从 asset_checkins 表获取
+                    do {
+                        Logger.debug("📋 [1/2] 开始查询 asset_checkins 表...")
+                        fetchedCheckIns = try await BuildingCheckInManager.shared.getCheckInsByNFC(nfcUuid: nfcUuid)
+                        Logger.success("📋 [1/2] ✅ 从 asset_checkins 获取到 \(fetchedCheckIns.count) 条记录")
+                        
+                        if fetchedCheckIns.isEmpty {
+                            Logger.warning("📋 [1/2] ⚠️ asset_checkins 表中没有找到此 UUID 的记录")
+                        } else {
+                            for (i, checkIn) in fetchedCheckIns.enumerated() {
+                                Logger.debug("📋    记录 \(i+1): \(checkIn.username) - \(checkIn.assetName ?? "无名称")")
+                            }
+                        }
+                    } catch {
+                        Logger.error("📋 [1/2] ❌ 从 asset_checkins 获取失败: \(error.localizedDescription)")
+                    }
+                    
+                    // 2. 从 oval_office_checkins 表获取
+                    do {
+                        Logger.debug("📋 [2/2] 开始查询 oval_office_checkins 表...")
+                        fetchedOvalOfficeCheckIns = try await OvalOfficeCheckInManager.shared.getCheckInsByNFC(nfcUuid: nfcUuid)
+                        Logger.success("📋 [2/2] ✅ 从 oval_office_checkins 获取到 \(fetchedOvalOfficeCheckIns.count) 条记录")
+                        
+                        if fetchedOvalOfficeCheckIns.isEmpty {
+                            Logger.warning("📋 [2/2] ⚠️ oval_office_checkins 表中没有找到此 UUID 的记录")
+                        } else {
+                            for (i, checkIn) in fetchedOvalOfficeCheckIns.enumerated() {
+                                Logger.debug("📋    记录 \(i+1): \(checkIn.username) - \(checkIn.assetName ?? "无名称")")
+                            }
+                        }
+                    } catch {
+                        Logger.error("📋 [2/2] ❌ 从 oval_office_checkins 获取失败: \(error.localizedDescription)")
+                    }
+                    
+                } else if let building = building {
+                    // 根据建筑ID获取历史记录（只查 asset_checkins）
+                    Logger.debug("📋 根据建筑ID获取历史记录: \(building.id)")
+                    fetchedCheckIns = try await BuildingCheckInManager.shared.getCheckIns(for: building.id)
+                    Logger.success("📋 获取到 \(fetchedCheckIns.count) 条建筑历史记录")
+                } else {
+                    // 没有指定建筑或NFC UUID
+                    Logger.warning("📋 没有指定建筑或NFC UUID")
+                }
+                
+                let totalCount = fetchedCheckIns.count + fetchedOvalOfficeCheckIns.count
+                
+                await MainActor.run {
+                    self.checkIns = fetchedCheckIns
+                    self.ovalOfficeCheckIns = fetchedOvalOfficeCheckIns
+                    self.isLoading = false
+                    Logger.success("📋 历史记录加载完成，共 \(totalCount) 条 (Buildings: \(fetchedCheckIns.count), OvalOffice: \(fetchedOvalOfficeCheckIns.count))")
+                    
+                    // 详细调试信息
+                    Logger.debug("📋 最终状态:")
+                    Logger.debug("   checkIns.isEmpty: \(fetchedCheckIns.isEmpty)")
+                    Logger.debug("   ovalOfficeCheckIns.isEmpty: \(fetchedOvalOfficeCheckIns.isEmpty)")
+                    Logger.debug("   isLoading: \(self.isLoading)")
+                    Logger.debug("   errorMessage: \(self.errorMessage ?? "nil")")
+                    
+                    if !fetchedCheckIns.isEmpty {
+                        for (i, checkIn) in fetchedCheckIns.enumerated() {
+                            Logger.debug("📋 Building记录 \(i+1): \(checkIn.username) - \(checkIn.assetName ?? "无名称") (NFC: \(checkIn.nfcUuid ?? "nil"))")
+                        }
+                    }
+                    
+                    if !fetchedOvalOfficeCheckIns.isEmpty {
+                        for (i, checkIn) in fetchedOvalOfficeCheckIns.enumerated() {
+                            Logger.debug("📋 OvalOffice记录 \(i+1): \(checkIn.username) - \(checkIn.assetName ?? "无名称") (NFC: \(checkIn.nfcUuid ?? "nil"))")
+                        }
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    self.errorMessage = error.localizedDescription
+                    self.isLoading = false
+                }
+                Logger.error("📋 加载历史记录失败: \(error.localizedDescription)")
+            }
+        }
+    }
+}
+
+// 建筑 Check-in 记录行
+struct BuildingCheckInRow: View {
+    let checkIn: BuildingCheckIn
+    @State private var image: UIImage?
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // 用户名和时间
+            HStack {
+                Text(checkIn.username)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.primary)
+                
+                Spacer()
+                
+                Text(checkIn.createdAt, style: .relative)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            
+            // Asset名称（如果有）
+            if let assetName = checkIn.assetName, !assetName.isEmpty {
+                Text(assetName)
+                    .font(.body)
+                    .fontWeight(.bold)
+                    .foregroundColor(appGreen)
+            }
+            
+            // 描述
+            if !checkIn.description.isEmpty {
+                Text(checkIn.description)
+                    .font(.body)
+                    .foregroundColor(.secondary)
+                    .lineLimit(2)
+            }
+            
+            // 图片（从本地加载）
+            if let image = image {
+                Image(uiImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(height: 80)
+                    .clipped()
+                    .cornerRadius(8)
+            }
+        }
+        .padding(12)
+        .background(Color.gray.opacity(0.1))
+        .cornerRadius(8)
+        .onAppear {
+            loadLocalImage()
+        }
+    }
+    
+    private func loadLocalImage() {
+        // 从 Supabase 加载图片
+        Logger.debug("Loading image for check-in: \(checkIn.id)")
+        
+        if let imageUrl = checkIn.imageUrl, !imageUrl.isEmpty {
+            Logger.debug("Image URL found: \(imageUrl)")
+            Task {
+                do {
+                    if let loadedImage = try await BuildingCheckInManager.shared.downloadImage(from: imageUrl) {
+                        Logger.success("✅ Image loaded successfully")
+                        await MainActor.run {
+                            self.image = loadedImage
+                        }
+                    } else {
+                        Logger.warning("⚠️ Image URL valid but image is nil")
+                    }
+                } catch {
+                    Logger.error("❌ Failed to load image: \(error.localizedDescription)")
+                }
+            }
+        } else {
+            Logger.debug("No image URL for this check-in")
+        }
     }
 }
 
@@ -5272,7 +5857,7 @@ struct NFCErrorModal: View {
                     .foregroundColor(.primary)
                     .multilineTextAlignment(.center)
                 
-                Text("The NFC tag location is more than 10 meters away from the target building. Please ensure you are near the correct building.")
+                Text("The NFC tag location is more than 30 meters away from the target building. Please ensure you are near the correct building.")
                     .font(.body)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
@@ -5370,9 +5955,17 @@ struct AssetHistoryContentView: View {
                 // 历史记录区域
                 ScrollView {
                     VStack(spacing: 16) {
-                        ForEach(0..<5) { index in
-                            HistoryItemView(index: index)
+                        // 显示历史记录提示
+                        VStack(spacing: 12) {
+                            Image(systemName: "clock.arrow.circlepath")
+                                .font(.system(size: 50))
+                                .foregroundColor(.gray.opacity(0.5))
+                            Text("No check-in history yet")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
                         }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 40)
                     }
                     .padding()
                 }
@@ -5429,14 +6022,11 @@ struct AssetHistoryContentView: View {
     }
 }
 
-// Check-in输入模态框 - 覆盖层版本
-struct CheckInInputModal: View {
-    @Binding var assetName: String
-    @Binding var assetImage: UIImage?
-    @Binding var assetDescription: String
-    let appGreen: Color
-    @ObservedObject var nfcManager: NFCManager
-    let onCancel: () -> Void
+// CheckInInputModal 已移到 Views/OvalOffice/CheckInInputModalView.swift
+
+// NFC坐标不匹配错误界面
+struct NFCErrorView: View {
+    let onBack: () -> Void
     
     var body: some View {
         ZStack {
@@ -5444,150 +6034,432 @@ struct CheckInInputModal: View {
             Color.black.opacity(0.4)
                 .ignoresSafeArea()
                 .onTapGesture {
-                    onCancel()
+                    onBack()
                 }
             
-            // 输入模态框
-            AssetInputModal(
-                ovalOfficeVM.assetName: $ovalOfficeVM.assetName,
-                ovalOfficeVM.assetImage: $ovalOfficeVM.assetImage,
-                ovalOfficeVM.assetDescription: $ovalOfficeVM.assetDescription,
-                appGreen: appGreen,
-                nfcManager: nfcManager,
-                onCancel: onCancel
-            )
-            .frame(maxWidth: 400, maxHeight: 700)
-            .transition(.opacity.combined(with: .scale(scale: 0.95)))
-        }
-    }
-}
-
-// 历史记录项
-struct HistoryItemView: View {
-    let index: Int
-    
-    var body: some View {
-        HStack(spacing: 12) {
-            // 头像
-            Circle()
-                .fill(appGreen.opacity(0.3))
-                .frame(width: 40, height: 40)
-                .overlay(
-                    Text("U\(index + 1)")
-                        .font(.caption)
-                        .fontWeight(.bold)
-                        .foregroundColor(appGreen)
-                )
-            
-            // 内容
-            VStack(alignment: .leading, spacing: 4) {
-                Text("User \(index + 1) checked in")
-                    .font(.body)
-                    .fontWeight(.medium)
-                    .foregroundColor(.primary)
-                
-                Text("2 hours ago")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            
-            Spacer()
-        }
-        .padding()
-        .background(Color(.systemGray6))
-        .cornerRadius(12)
-    }
-}
-
-// NFC坐标不匹配错误界面
-struct NFCErrorView: View {
-    let onBack: () -> Void
-    
-    var body: some View {
-        VStack(spacing: 0) {
-            // 顶部导航栏
-            HStack {
-                Button(action: onBack) {
-                    HStack {
-                        Image(systemName: "chevron.left")
-                            .font(.title2)
-                        Text("Back")
-                            .font(.headline)
-                    }
-                    .foregroundColor(appGreen)
-                }
-                
-                Spacer()
-                
-                Text("Location Error")
-                    .font(.headline)
-                    .fontWeight(.semibold)
-                
-                Spacer()
-                
-                // 占位符，保持标题居中
+            // 错误信息框
+            VStack(spacing: 0) {
+                // 顶部导航栏
                 HStack {
-                    Image(systemName: "chevron.left")
-                        .font(.title2)
-                    Text("Back")
+                    Button(action: onBack) {
+                        Image(systemName: "xmark")
+                            .font(.title2)
+                            .foregroundColor(.gray)
+                    }
+                    
+                    Spacer()
+                    
+                    Text("Location Error")
                         .font(.headline)
+                        .fontWeight(.semibold)
+                    
+                    Spacer()
+                    
+                    // 占位符，保持标题居中
+                    Button(action: {}) {
+                        Image(systemName: "xmark")
+                            .font(.title2)
+                            .foregroundColor(.clear)
+                    }
+                    .disabled(true)
                 }
-                .opacity(0)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
+                .background(Color(.systemBackground))
+                
+                Divider()
+                
+                // 内容区域
+                VStack(spacing: 30) {
+                    Spacer()
+                    
+                    // 错误图标
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.system(size: 80))
+                        .foregroundColor(appGreen)
+                    
+                    // 错误信息
+                    VStack(spacing: 16) {
+                        Text("NFC and Asset Location Mismatch")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .foregroundColor(.primary)
+                        
+                        Text("The NFC tag location is more than 30 meters away from the target building. Please ensure you are near the correct building.")
+                            .font(.body)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 40)
+                    }
+                    
+                    Spacer()
+                    
+                    // 关闭按钮 - 绿色毛玻璃样式
+                    Button(action: onBack) {
+                        Text("Close")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                            .foregroundColor(appGreen)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background {
+                                ZStack {
+                                    Color.clear.background(.ultraThinMaterial)
+                                    LinearGradient(
+                                        gradient: Gradient(colors: [
+                                            appGreen.opacity(0.15),
+                                            appGreen.opacity(0.05)
+                                        ]),
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    )
+                                }
+                            }
+                            .cornerRadius(12)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .strokeBorder(
+                                        LinearGradient(
+                                            gradient: Gradient(stops: [
+                                                .init(color: Color.white.opacity(0.6), location: 0.0),
+                                                .init(color: Color.white.opacity(0.0), location: 0.3),
+                                                .init(color: appGreen.opacity(0.2), location: 0.7),
+                                                .init(color: appGreen.opacity(0.4), location: 1.0)
+                                            ]),
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        ),
+                                        lineWidth: 1.5
+                                    )
+                            )
+                            .shadow(color: appGreen.opacity(0.2), radius: 8, x: 0, y: 4)
+                            .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
+                    }
+                    .padding(.horizontal, 40)
+                    .padding(.bottom, 40)
+                }
+                .background(Color(.systemBackground))
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 20)
-            .padding(.bottom, 10)
+            .frame(maxWidth: 340, maxHeight: 500)
+            .background(Color(.systemBackground))
+            .cornerRadius(16)
+            .shadow(radius: 20)
+        }
+    }
+}
+
+// 我的历史记录界面
+struct MyHistoryView: View {
+    let username: String
+    let appGreen: Color
+    let onClose: () -> Void
+    
+    @State private var myCheckIns: [BuildingCheckIn] = []
+    @State private var ovalCheckIns: [OvalOfficeCheckIn] = []
+    @State private var isLoading = false
+    @State private var errorMessage: String?
+    
+    var body: some View {
+        ZStack {
+            // 半透明背景
+            Color.black.opacity(0.4)
+                .ignoresSafeArea()
+                .onTapGesture {
+                    onClose()
+                }
             
-            // 内容区域
-            VStack(spacing: 30) {
-                Spacer()
-                
-                // 错误图标
-                Image(systemName: "exclamationmark.triangle")
-                    .font(.system(size: 80))
-                    .foregroundColor(.orange)
-                
-                // 错误信息
-                VStack(spacing: 16) {
-                    Text("NFC与Asset坐标不匹配")
-                        .font(.title2)
+            // 内容框
+            VStack(spacing: 0) {
+                // 标题栏
+                HStack {
+                    Text("My Check-in History")
+                        .font(.headline)
                         .fontWeight(.bold)
                         .foregroundColor(.primary)
                     
-                    Text("NFC标签的位置与目标建筑的距离超过10米，请确保您在正确的建筑附近。")
-                        .font(.body)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 40)
+                    Spacer()
+                    
+                    Button(action: onClose) {
+                        Image(systemName: "xmark")
+                            .font(.title3)
+                            .foregroundColor(.secondary)
+                    }
                 }
+                .padding(.horizontal, 20)
+                .padding(.top, 20)
+                .padding(.bottom, 16)
+                
+                // 用户信息
+                HStack(spacing: 8) {
+                    Image(systemName: "person.circle.fill")
+                        .font(.title2)
+                        .foregroundColor(appGreen)
+                    
+                    Text(username)
+                        .font(.title3)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.primary)
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 16)
+                
+                Divider()
+                    .padding(.horizontal, 20)
+                
+                // 历史记录列表
+                ScrollView {
+                    LazyVStack(spacing: 16) {
+                        if isLoading {
+                            ProgressView()
+                                .padding(.vertical, 40)
+                        } else if let error = errorMessage {
+                            VStack(spacing: 12) {
+                                Image(systemName: "exclamationmark.triangle")
+                                    .font(.system(size: 50))
+                                    .foregroundColor(appGreen.opacity(0.5))
+                                Text("Failed to load history")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                Text(error)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                
+                                Button("Retry") {
+                                    loadMyHistory()
+                                }
+                                .foregroundColor(appGreen)
+                            }
+                            .padding(.vertical, 40)
+                        } else if myCheckIns.isEmpty && ovalCheckIns.isEmpty {
+                            VStack(spacing: 12) {
+                                Image(systemName: "clock.arrow.circlepath")
+                                    .font(.system(size: 50))
+                                    .foregroundColor(.gray.opacity(0.5))
+                                Text("No check-in history yet")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                Text("Start checking in to see your history!")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding(.vertical, 40)
+                        } else {
+                            // 显示历史建筑Check-ins
+                            if !myCheckIns.isEmpty {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("Historic Buildings (\(myCheckIns.count))")
+                                        .font(.subheadline)
+                                        .fontWeight(.semibold)
+                                        .foregroundColor(.secondary)
+                                        .padding(.horizontal, 20)
+                                    
+                                    ForEach(myCheckIns) { checkIn in
+                                        BuildingCheckInRow(checkIn: checkIn)
+                                            .padding(.horizontal, 20)
+                                    }
+                                }
+                                .padding(.top, 16)
+                            }
+                            
+                            // 显示Oval Office Check-ins
+                            if !ovalCheckIns.isEmpty {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("Oval Office (\(ovalCheckIns.count))")
+                                        .font(.subheadline)
+                                        .fontWeight(.semibold)
+                                        .foregroundColor(.secondary)
+                                        .padding(.horizontal, 20)
+                                    
+                                    ForEach(ovalCheckIns) { checkIn in
+                                        OvalOfficeCheckInRow(checkIn: checkIn, appGreen: appGreen)
+                                            .padding(.horizontal, 20)
+                                    }
+                                }
+                                .padding(.top, 16)
+                            }
+                        }
+                    }
+                    .padding(.bottom, 20)
+                }
+            }
+            .background(Color(.systemBackground))
+            .cornerRadius(16)
+            .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 5)
+            .padding(.horizontal, 20)
+            .frame(maxHeight: 700)
+        }
+        .onAppear {
+            loadMyHistory()
+        }
+    }
+    
+    private func loadMyHistory() {
+        isLoading = true
+        errorMessage = nil
+        
+        Task {
+            do {
+                // 加载历史建筑的Check-ins
+                async let buildingCheckIns = loadBuildingCheckIns()
+                
+                // 加载Oval Office的Check-ins
+                async let ovalOfficeCheckIns = loadOvalOfficeCheckIns()
+                
+                let (buildings, ovals) = try await (buildingCheckIns, ovalOfficeCheckIns)
+                
+                await MainActor.run {
+                    self.myCheckIns = buildings
+                    self.ovalCheckIns = ovals
+                    self.isLoading = false
+                    Logger.success("✅ Loaded \(buildings.count) building check-ins, \(ovals.count) oval office check-ins")
+                }
+            } catch {
+                await MainActor.run {
+                    self.errorMessage = error.localizedDescription
+                    self.isLoading = false
+                    Logger.error("❌ Failed to load history: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+    
+    private func loadBuildingCheckIns() async throws -> [BuildingCheckIn] {
+        let baseURL = SupabaseConfig.url
+        let apiKey = SupabaseConfig.anonKey
+        
+        guard let url = URL(string: "\(baseURL)/rest/v1/asset_checkins?username=eq.\(username)&order=created_at.desc") else {
+            throw NSError(domain: "InvalidURL", code: -1)
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue(apiKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw NSError(domain: "FetchFailed", code: -1)
+        }
+        
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode([BuildingCheckIn].self, from: data)
+    }
+    
+    private func loadOvalOfficeCheckIns() async throws -> [OvalOfficeCheckIn] {
+        let baseURL = SupabaseConfig.url
+        let apiKey = SupabaseConfig.anonKey
+        
+        guard let url = URL(string: "\(baseURL)/rest/v1/oval_office_checkins?username=eq.\(username)&order=created_at.desc") else {
+            throw NSError(domain: "InvalidURL", code: -1)
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue(apiKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw NSError(domain: "FetchFailed", code: -1)
+        }
+        
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode([OvalOfficeCheckIn].self, from: data)
+    }
+}
+
+// Oval Office Check-in 行视图（用于我的历史记录）
+struct OvalOfficeCheckInRow: View {
+    let checkIn: OvalOfficeCheckIn
+    let appGreen: Color
+    
+    @State private var image: UIImage? = nil
+    @State private var isLoadingImage: Bool = false
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // 时间和Grid坐标
+            HStack {
+                Text(checkIn.createdAt, style: .relative)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
                 
                 Spacer()
                 
-                // 返回按钮
-                Button(action: onBack) {
-                    Text("Back to Navigation")
-                        .font(.headline)
-                        .fontWeight(.semibold)
+                HStack(spacing: 4) {
+                    Image(systemName: "map")
+                        .font(.caption)
                         .foregroundColor(appGreen)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background {
-                            ZStack {
-                                Color.clear.background(.ultraThinMaterial)
-                                appGreen.opacity(0.1)
-                            }
-                        }
-                        .cornerRadius(12)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(appGreen.opacity(0.3), lineWidth: 1)
-                        )
+                    Text("Grid (\(checkIn.gridX), \(checkIn.gridY))")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
-                .padding(.horizontal, 40)
-                .padding(.bottom, 40)
+            }
+            
+            // Asset名称
+            if let assetName = checkIn.assetName, !assetName.isEmpty {
+                Text(assetName)
+                    .font(.body)
+                    .fontWeight(.bold)
+                    .foregroundColor(.primary)
+            }
+            
+            // 描述
+            if !checkIn.description.isEmpty {
+                Text(checkIn.description)
+                    .font(.body)
+                    .foregroundColor(.secondary)
+                    .lineLimit(2)
+            }
+            
+            // 图片
+            if isLoadingImage {
+                ProgressView()
+                    .frame(height: 80)
+            } else if let image = image {
+                Image(uiImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(height: 80)
+                    .clipped()
+                    .cornerRadius(8)
             }
         }
-        .background(Color(.systemBackground))
+        .padding(12)
+        .background(Color.gray.opacity(0.1))
+        .cornerRadius(8)
+        .onAppear {
+            loadImageIfNeeded()
+        }
+    }
+    
+    private func loadImageIfNeeded() {
+        guard let imageUrl = checkIn.imageUrl, !imageUrl.isEmpty, image == nil else {
+            return
+        }
+        
+        isLoadingImage = true
+        
+        Task {
+            do {
+                let loadedImage = try await OvalOfficeCheckInManager.shared.downloadImage(from: imageUrl)
+                await MainActor.run {
+                    self.image = loadedImage
+                    self.isLoadingImage = false
+                }
+            } catch {
+                await MainActor.run {
+                    self.isLoadingImage = false
+                }
+                Logger.error("Failed to load image: \(error.localizedDescription)")
+            }
+        }
     }
 }
 
@@ -5619,6 +6491,607 @@ class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate, ASAut
             return UIWindow()
         }
         return window
+    }
+}
+
+// MARK: - 我的历史记录全屏视图
+struct MyHistoryFullScreenView: View {
+    let username: String
+    let appGreen: Color
+    let onClose: () -> Void
+    let onNavigateToBuilding: ((Double, Double) -> Void)? // 导航到建筑的回调
+    let onNavigateToOvalOffice: (() -> Void)? // 导航到Oval Office的回调
+    
+    @State private var myCheckIns: [BuildingCheckIn] = []
+    @State private var ovalCheckIns: [OvalOfficeCheckIn] = []
+    @State private var isLoading = false
+    @State private var errorMessage: String?
+    @State private var selectedBuildingCheckIn: BuildingCheckIn? = nil
+    @State private var selectedOvalCheckIn: OvalOfficeCheckIn? = nil
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 0) {
+                // 顶部导航栏
+                HStack {
+                    // 返回按钮 - 白色圆形按钮 + 黑色<
+                    Button(action: onClose) {
+                        ZStack {
+                            Circle().fill(Color.white)
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(.black)
+                        }
+                        .frame(width: 36, height: 36)
+                        .shadow(radius: 2)
+                    }
+                    
+                    Spacer()
+                    
+                    Text("My History")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                    
+                    Spacer()
+                    
+                    // 占位符保持标题居中
+                    ZStack {
+                        Circle().fill(Color.white)
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 16))
+                            .foregroundStyle(.black)
+                    }
+                    .frame(width: 36, height: 36)
+                    .opacity(0)
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
+                .background(Color(.systemBackground))
+                
+                Divider()
+                
+                // 用户信息卡片 - 毛玻璃样式
+                HStack(spacing: 16) {
+                    // 用户头像 - 毛玻璃样式（缩小到70%）
+                    ZStack {
+                        // 渐变背景
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    gradient: Gradient(colors: [
+                                        appGreen.opacity(0.3),
+                                        appGreen.opacity(0.1)
+                                    ]),
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                        
+                        // 图标
+                        Image(systemName: "person.fill")
+                            .font(.system(size: 20))
+                            .foregroundColor(.white)
+                    }
+                    .frame(width: 45, height: 45)
+                    .background(.ultraThinMaterial)
+                    .clipShape(Circle())
+                    .overlay(
+                        Circle()
+                            .strokeBorder(
+                                LinearGradient(
+                                    gradient: Gradient(stops: [
+                                        .init(color: Color.white.opacity(0.6), location: 0.0),
+                                        .init(color: Color.white.opacity(0.0), location: 0.3),
+                                        .init(color: appGreen.opacity(0.3), location: 0.7),
+                                        .init(color: appGreen.opacity(0.5), location: 1.0)
+                                    ]),
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 2
+                            )
+                    )
+                    .shadow(color: appGreen.opacity(0.3), radius: 10, x: 0, y: 5)
+                    .shadow(color: Color.black.opacity(0.15), radius: 3, x: 0, y: 2)
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(username)
+                            .font(.title3)
+                            .fontWeight(.bold)
+                            .foregroundColor(.primary)
+                        
+                        Text("\(myCheckIns.count + ovalCheckIns.count) Check-ins")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Spacer()
+                }
+                .padding(20)
+                .background(
+                    ZStack {
+                        Color.clear.background(.ultraThinMaterial)
+                        LinearGradient(
+                            gradient: Gradient(colors: [
+                                appGreen.opacity(0.08),
+                                appGreen.opacity(0.02)
+                            ]),
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    }
+                )
+                
+                // 内容区域
+                if isLoading {
+                    Spacer()
+                    ProgressView("Loading your history...")
+                        .progressViewStyle(CircularProgressViewStyle(tint: appGreen))
+                    Spacer()
+                } else if let error = errorMessage {
+                    Spacer()
+                    VStack(spacing: 16) {
+                        Image(systemName: "exclamationmark.triangle")
+                            .font(.system(size: 48))
+                            .foregroundColor(appGreen)
+                        Text("Failed to load history")
+                            .font(.headline)
+                        Text(error)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                        Button("Retry") {
+                            loadHistory()
+                        }
+                        .foregroundColor(appGreen)
+                    }
+                    Spacer()
+                } else if myCheckIns.isEmpty && ovalCheckIns.isEmpty {
+                    Spacer()
+                    VStack(spacing: 16) {
+                        Image(systemName: "tray")
+                            .font(.system(size: 48))
+                            .foregroundColor(.secondary)
+                        Text("No Check-ins Yet")
+                            .font(.headline)
+                        Text("Start exploring and check in to buildings!")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+                } else {
+                    ScrollView {
+                        VStack(spacing: 24) {
+                            // Historic Buildings Section
+                            if !myCheckIns.isEmpty {
+                                VStack(alignment: .leading, spacing: 12) {
+                                    HStack {
+                                        Image(systemName: "building.2")
+                                            .foregroundColor(appGreen)
+                                        Text("Historic Buildings")
+                                            .font(.title3)
+                                            .fontWeight(.bold)
+                                        Spacer()
+                                        Text("\(myCheckIns.count)")
+                                            .font(.subheadline)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    .padding(.horizontal, 20)
+                                    
+                                    ForEach(myCheckIns, id: \.id) { checkIn in
+                                        CompactCheckInRow(
+                                            time: checkIn.createdAt,
+                                            assetName: checkIn.assetName ?? "Unknown",
+                                            description: checkIn.description,
+                                            appGreen: appGreen
+                                        )
+                                        .padding(.horizontal, 20)
+                                        .onTapGesture {
+                                            selectedBuildingCheckIn = checkIn
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            // Oval Office Section
+                            if !ovalCheckIns.isEmpty {
+                                VStack(alignment: .leading, spacing: 12) {
+                                    HStack {
+                                        Image(systemName: "circle")
+                                            .foregroundColor(appGreen)
+                                        Text("Oval Office")
+                                            .font(.title3)
+                                            .fontWeight(.bold)
+                                        Spacer()
+                                        Text("\(ovalCheckIns.count)")
+                                            .font(.subheadline)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    .padding(.horizontal, 20)
+                                    
+                                    ForEach(ovalCheckIns, id: \.id) { checkIn in
+                                        CompactCheckInRow(
+                                            time: checkIn.createdAt,
+                                            assetName: checkIn.assetName ?? "Unknown",
+                                            description: checkIn.description,
+                                            appGreen: appGreen
+                                        )
+                                        .padding(.horizontal, 20)
+                                        .onTapGesture {
+                                            selectedOvalCheckIn = checkIn
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        .padding(.vertical, 20)
+                    }
+                }
+            }
+            .background(Color(.systemBackground))
+            .navigationBarHidden(true)
+            .overlay {
+                // 建筑Check-in详情页
+                if let checkIn = selectedBuildingCheckIn {
+                    CheckInDetailView(
+                        checkIn: checkIn,
+                        appGreen: appGreen,
+                        onClose: {
+                            selectedBuildingCheckIn = nil
+                        },
+                        onNavigate: onNavigateToBuilding
+                    )
+                }
+                
+                // Oval Office Check-in详情页
+                if let checkIn = selectedOvalCheckIn {
+                    OvalOfficeCheckInDetailView(
+                        checkIn: checkIn,
+                        appGreen: appGreen,
+                        onClose: {
+                            selectedOvalCheckIn = nil
+                        },
+                        onNavigateToOvalOffice: {
+                            Logger.debug("📍 导航到Oval Office")
+                            // 关闭详情
+                            selectedOvalCheckIn = nil
+                            
+                            // 使用传入的回调
+                            if let navigateCallback = onNavigateToOvalOffice {
+                                navigateCallback()
+                            }
+                        }
+                    )
+                }
+            }
+        }
+        .onAppear {
+            Logger.debug("MyHistoryFullScreenView appeared, loading data...")
+            loadHistory()
+        }
+    }
+    
+    private func loadHistory() {
+        isLoading = true
+        errorMessage = nil
+        
+        Task {
+            do {
+                // 加载Historic Buildings check-ins
+                let buildings = try await BuildingCheckInManager.shared.fetchUserCheckIns(username: username)
+                
+                // 加载Oval Office check-ins
+                let oval = try await OvalOfficeCheckInManager.shared.fetchUserCheckIns(username: username)
+                
+                await MainActor.run {
+                    self.myCheckIns = buildings
+                    self.ovalCheckIns = oval
+                    self.isLoading = false
+                    Logger.success("Loaded \(buildings.count) building check-ins and \(oval.count) oval office check-ins")
+                }
+            } catch {
+                await MainActor.run {
+                    self.errorMessage = error.localizedDescription
+                    self.isLoading = false
+                    Logger.error("Failed to load history: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+}
+
+// NFC历史记录全屏视图（与MyHistoryFullScreenView样式一致）
+// 只读模式：仅查看历史记录，不支持新增Check-in
+struct NFCHistoryFullScreenView: View {
+    let nfcUuid: String
+    let appGreen: Color
+    let onClose: () -> Void
+    let onNavigateToBuilding: ((Double, Double) -> Void)? // 导航到建筑的回调
+    let onNavigateToOvalOffice: (() -> Void)? // 导航到Oval Office的回调
+    
+    @State private var checkIns: [BuildingCheckIn] = []
+    @State private var ovalCheckIns: [OvalOfficeCheckIn] = []
+    @State private var isLoading = false
+    @State private var errorMessage: String?
+    @State private var selectedBuildingCheckIn: BuildingCheckIn?
+    @State private var selectedOvalCheckIn: OvalOfficeCheckIn?
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // 顶部导航栏
+            HStack {
+                // 关闭按钮
+                Button(action: onClose) {
+                    Image(systemName: "xmark")
+                        .font(.title3)
+                        .foregroundColor(.gray)
+                        .frame(width: 44, height: 44)
+                }
+                
+                Spacer()
+                
+                Text("NFC History")
+                    .font(.title3)
+                    .fontWeight(.bold)
+                
+                Spacer()
+                
+                // 占位符保持标题居中
+                Color.clear
+                    .frame(width: 44, height: 44)
+            }
+            .padding(.horizontal, 8)
+            .padding(.top, 8)
+            
+            Divider()
+            
+            // NFC信息卡片 - 毛玻璃样式
+            HStack(spacing: 16) {
+                // NFC图标 - 毛玻璃样式
+                ZStack {
+                    // 渐变背景
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                gradient: Gradient(colors: [
+                                    appGreen.opacity(0.3),
+                                    appGreen.opacity(0.1)
+                                ]),
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                    
+                    // 图标
+                    Image(systemName: "wave.3.right")
+                        .font(.system(size: 20))
+                        .foregroundColor(.white)
+                }
+                .frame(width: 45, height: 45)
+                .background(.ultraThinMaterial)
+                .clipShape(Circle())
+                .overlay(
+                    Circle()
+                        .strokeBorder(
+                            LinearGradient(
+                                gradient: Gradient(stops: [
+                                    .init(color: Color.white.opacity(0.6), location: 0.0),
+                                    .init(color: Color.white.opacity(0.0), location: 0.3),
+                                    .init(color: appGreen.opacity(0.3), location: 0.7),
+                                    .init(color: appGreen.opacity(0.5), location: 1.0)
+                                ]),
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 2
+                        )
+                )
+                .shadow(color: appGreen.opacity(0.3), radius: 10, x: 0, y: 5)
+                .shadow(color: Color.black.opacity(0.15), radius: 3, x: 0, y: 2)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("NFC Tag")
+                        .font(.title3)
+                        .fontWeight(.bold)
+                        .foregroundColor(.primary)
+                    
+                    Text("\(checkIns.count + ovalCheckIns.count) Check-ins")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                
+                Spacer()
+            }
+            .padding(20)
+            .background(
+                ZStack {
+                    Color.clear.background(.ultraThinMaterial)
+                    LinearGradient(
+                        gradient: Gradient(colors: [
+                            appGreen.opacity(0.08),
+                            appGreen.opacity(0.02)
+                        ]),
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                }
+            )
+            
+            // 内容区域
+            if isLoading {
+                Spacer()
+                ProgressView("Loading history...")
+                    .progressViewStyle(CircularProgressViewStyle(tint: appGreen))
+                Spacer()
+            } else if let error = errorMessage {
+                Spacer()
+                VStack(spacing: 16) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.system(size: 48))
+                        .foregroundColor(appGreen)
+                    Text("Failed to load history")
+                        .font(.headline)
+                    Text(error)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                    Button("Retry") {
+                        loadHistory()
+                    }
+                    .foregroundColor(appGreen)
+                }
+                Spacer()
+            } else if checkIns.isEmpty && ovalCheckIns.isEmpty {
+                Spacer()
+                VStack(spacing: 24) {
+                    Image(systemName: "tray")
+                        .font(.system(size: 48))
+                        .foregroundColor(.secondary)
+                    Text("No Check-ins Yet")
+                        .font(.headline)
+                    Text("This NFC tag has no check-in history.")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                Spacer()
+            } else {
+                ScrollView {
+                    VStack(spacing: 24) {
+                        // Historic Buildings Section
+                        if !checkIns.isEmpty {
+                            VStack(alignment: .leading, spacing: 12) {
+                                HStack {
+                                    Image(systemName: "building.2")
+                                        .foregroundColor(appGreen)
+                                    Text("Historic Buildings")
+                                        .font(.title3)
+                                        .fontWeight(.bold)
+                                    Spacer()
+                                    Text("\(checkIns.count)")
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                }
+                                .padding(.horizontal, 20)
+                                
+                                ForEach(checkIns, id: \.id) { checkIn in
+                                    CompactCheckInRow(
+                                        time: checkIn.createdAt,
+                                        assetName: checkIn.assetName ?? "Unknown",
+                                        description: checkIn.description,
+                                        appGreen: appGreen
+                                    )
+                                    .padding(.horizontal, 20)
+                                    .onTapGesture {
+                                        selectedBuildingCheckIn = checkIn
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Oval Office Section
+                        if !ovalCheckIns.isEmpty {
+                            VStack(alignment: .leading, spacing: 12) {
+                                HStack {
+                                    Image(systemName: "circle")
+                                        .foregroundColor(appGreen)
+                                    Text("Oval Office")
+                                        .font(.title3)
+                                        .fontWeight(.bold)
+                                    Spacer()
+                                    Text("\(ovalCheckIns.count)")
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                }
+                                .padding(.horizontal, 20)
+                                
+                                ForEach(ovalCheckIns, id: \.id) { checkIn in
+                                    CompactCheckInRow(
+                                        time: checkIn.createdAt,
+                                        assetName: checkIn.assetName ?? "Unknown",
+                                        description: checkIn.description,
+                                        appGreen: appGreen
+                                    )
+                                    .padding(.horizontal, 20)
+                                    .onTapGesture {
+                                        selectedOvalCheckIn = checkIn
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    .padding(.vertical, 20)
+                }
+            }
+        }
+        .background(Color(.systemBackground))
+        .navigationBarHidden(true)
+        .overlay {
+            // 建筑Check-in详情页
+            if let checkIn = selectedBuildingCheckIn {
+                CheckInDetailView(
+                    checkIn: checkIn,
+                    appGreen: appGreen,
+                    onClose: {
+                        selectedBuildingCheckIn = nil
+                    },
+                    onNavigate: onNavigateToBuilding
+                )
+            }
+            
+            // Oval Office Check-in详情页
+            if let checkIn = selectedOvalCheckIn {
+                OvalOfficeCheckInDetailView(
+                    checkIn: checkIn,
+                    appGreen: appGreen,
+                    onClose: {
+                        selectedOvalCheckIn = nil
+                    },
+                    onNavigateToOvalOffice: onNavigateToOvalOffice
+                )
+            }
+        }
+        .onAppear {
+            loadHistory()
+        }
+    }
+    
+    private func loadHistory() {
+        Logger.debug("📋 开始加载NFC历史记录: \(nfcUuid)")
+        isLoading = true
+        errorMessage = nil
+        
+        Task {
+            var fetchedCheckIns: [BuildingCheckIn] = []
+            var fetchedOvalCheckIns: [OvalOfficeCheckIn] = []
+            
+            // 从 asset_checkins 表获取
+            do {
+                Logger.debug("📋 查询 asset_checkins 表...")
+                fetchedCheckIns = try await BuildingCheckInManager.shared.getCheckInsByNFC(nfcUuid: nfcUuid)
+                Logger.success("📋 从 asset_checkins 获取到 \(fetchedCheckIns.count) 条记录")
+            } catch {
+                Logger.error("📋 从 asset_checkins 获取失败: \(error.localizedDescription)")
+            }
+            
+            // 从 oval_office_checkins 表获取
+            do {
+                Logger.debug("📋 查询 oval_office_checkins 表...")
+                fetchedOvalCheckIns = try await OvalOfficeCheckInManager.shared.getCheckInsByNFC(nfcUuid: nfcUuid)
+                Logger.success("📋 从 oval_office_checkins 获取到 \(fetchedOvalCheckIns.count) 条记录")
+            } catch {
+                Logger.error("📋 从 oval_office_checkins 获取失败: \(error.localizedDescription)")
+            }
+            
+            await MainActor.run {
+                self.checkIns = fetchedCheckIns
+                self.ovalCheckIns = fetchedOvalCheckIns
+                self.isLoading = false
+                Logger.success("📋 NFC历史记录加载完成，共 \(fetchedCheckIns.count + fetchedOvalCheckIns.count) 条")
+            }
+        }
     }
 }
 
