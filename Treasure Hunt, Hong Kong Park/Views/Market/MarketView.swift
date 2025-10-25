@@ -27,6 +27,7 @@ struct MarketView: View {
     @State private var showBidList = false
     @State private var unreadBidCount = 0
     @State private var userCredits = 0
+    @State private var frozenCredits = 0
     
     var body: some View {
         VStack(spacing: 0) {
@@ -119,18 +120,33 @@ struct MarketView: View {
             // MARK: - Tab切换区
             HStack(spacing: 12) {
                 // Credits显示
-                HStack(spacing: 6) {
-                    Image(systemName: "star.fill")
-                        .font(.system(size: 14))
-                        .foregroundColor(appGreen)
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "star.fill")
+                            .font(.system(size: 14))
+                            .foregroundColor(appGreen)
+                        
+                        Text("\(userCredits - frozenCredits)")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundColor(appGreen)
+                        
+                        Text("Credits")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
                     
-                    Text("\(userCredits)")
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundColor(appGreen)
-                    
-                    Text("Credits")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    // 冻结Credits提示（如果有）
+                    if frozenCredits > 0 {
+                        HStack(spacing: 4) {
+                            Image(systemName: "lock.fill")
+                                .font(.system(size: 8))
+                                .foregroundColor(.orange)
+                            
+                            Text("\(frozenCredits) frozen")
+                                .font(.system(size: 9))
+                                .foregroundColor(.orange)
+                        }
+                    }
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
@@ -305,19 +321,27 @@ struct MarketView: View {
         // Credits应该与Top Users的activity_score保持一致
         // 优先从topUsers中获取，如果找不到则从CreditsManager
         if let userStats = topUsers.first(where: { $0.username == username }) {
+            let frozen = CreditsManager.shared.getFrozenCredits(for: username)
+            
             await MainActor.run {
                 self.userCredits = userStats.activityScore
+                self.frozenCredits = frozen
                 // 同步到CreditsManager
                 CreditsManager.shared.setCredits(userStats.activityScore, for: username)
             }
             Logger.debug("💰 User credits synced from activity_score: \(userStats.activityScore) for @\(username)")
+            Logger.debug("🧊 Frozen credits: \(frozen), Available: \(userStats.activityScore - frozen)")
         } else {
             // Fallback: 从CreditsManager获取
             let credits = CreditsManager.shared.getCredits(for: username)
+            let frozen = CreditsManager.shared.getFrozenCredits(for: username)
+            
             await MainActor.run {
                 self.userCredits = credits
+                self.frozenCredits = frozen
             }
             Logger.debug("💰 User credits loaded from CreditsManager: \(credits) for @\(username)")
+            Logger.debug("🧊 Frozen credits: \(frozen), Available: \(credits - frozen)")
         }
     }
     

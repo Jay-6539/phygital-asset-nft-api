@@ -285,8 +285,8 @@ struct CheckInDetailView: View {
                     .padding(20)
                 }
             }
-            .frame(maxWidth: 400)
-            .frame(maxHeight: 750)
+            .frame(maxWidth: 550)
+            .frame(maxHeight: .infinity)
             .background(Color(.systemBackground))
             .cornerRadius(20)
             .shadow(radius: 20)

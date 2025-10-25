@@ -27,7 +27,7 @@ struct BidInputView: View {
     
     var canSubmit: Bool {
         guard let amount = Int(bidAmount), amount > 0 else { return false }
-        return amount <= availableCredits && !message.isEmpty
+        return amount <= availableCredits
     }
     
     var body: some View {
@@ -181,22 +181,19 @@ struct BidInputView: View {
                     .disabled(isSubmitting)
                     
                     Button(action: submitBid) {
-                            HStack(spacing: 6) {
-                                if isSubmitting {
-                                    ProgressView()
-                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                } else {
-                                    Text("Submit")
-                                        .font(.subheadline)
-                                        .fontWeight(.semibold)
-                                }
-                            }
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 32)
-                        .padding(.vertical, 12)
-                        .background(canSubmit ? appGreen : Color.gray)
-                        .cornerRadius(10)
+                        if isSubmitting {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        } else {
+                            Text("Submit")
+                                .font(.headline)
+                        }
                     }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(canSubmit ? appGreen : Color.gray)
+                    .cornerRadius(12)
                     .disabled(!canSubmit || isSubmitting)
                 }
                 .padding(20)
