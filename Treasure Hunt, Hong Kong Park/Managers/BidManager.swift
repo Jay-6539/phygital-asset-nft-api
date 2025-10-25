@@ -73,8 +73,7 @@ class BidManager {
             retries: 3
         )
         
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        // 复用已创建的decoder
         let bids = try decoder.decode([Bid].self, from: data)
         
         guard let bid = bids.first else {
