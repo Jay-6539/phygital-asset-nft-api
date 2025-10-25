@@ -14,11 +14,9 @@ struct BuildingHistoryView: View {
     let currentUsername: String?
     
     @State private var buildingRecords: [BuildingCheckIn] = []
-    @State private var ovalRecords: [OvalOfficeCheckIn] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var selectedBuildingRecord: BuildingCheckIn?
-    @State private var selectedOvalRecord: OvalOfficeCheckIn?
     
     var body: some View {
         ZStack {
@@ -48,7 +46,7 @@ struct BuildingHistoryView: View {
                             .fontWeight(.bold)
                             .lineLimit(1)
                         
-                        Text("\(buildingRecords.count + ovalRecords.count) records")
+                        Text("\(buildingRecords.count) records")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -92,7 +90,7 @@ struct BuildingHistoryView: View {
                             .padding(.horizontal, 40)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if buildingRecords.isEmpty && ovalRecords.isEmpty {
+                } else if buildingRecords.isEmpty {
                     // 空状态
                     VStack(spacing: 20) {
                         ZStack {
@@ -132,20 +130,6 @@ struct BuildingHistoryView: View {
                                     selectedBuildingRecord = record
                                 }
                             }
-                            
-                            // Oval Office check-ins
-                            ForEach(ovalRecords) { record in
-                                CompactHistoryRow(
-                                    username: record.username,
-                                    description: record.description.isEmpty ? (record.assetName ?? "") : record.description,
-                                    createdAt: record.createdAt,
-                                    appGreen: appGreen,
-                                    isOvalOffice: true
-                                )
-                                .onTapGesture {
-                                    selectedOvalRecord = record
-                                }
-                            }
                         }
                         .padding(16)
                     }
@@ -161,18 +145,9 @@ struct BuildingHistoryView: View {
                 CheckInDetailView(
                     checkIn: record,
                     appGreen: appGreen,
-                    currentUsername: currentUsername,
-                    onClose: { selectedBuildingRecord = nil }
-                )
-            }
-        }
-        .overlay {
-            if let record = selectedOvalRecord {
-                OvalOfficeCheckInDetailView(
-                    checkIn: record,
-                    appGreen: appGreen,
-                    currentUsername: currentUsername,
-                    onClose: { selectedOvalRecord = nil }
+                    onClose: { selectedBuildingRecord = nil },
+                    onNavigate: nil, // Market中不需要导航
+                    currentUsername: currentUsername
                 )
             }
         }
@@ -185,19 +160,15 @@ struct BuildingHistoryView: View {
         
         Task {
             do {
-                // 并行加载建筑和Oval Office记录
-                async let buildingTask = BuildingCheckInManager.shared.getCheckIns(for: building.id)
-                async let ovalTask = OvalOfficeCheckInManager.shared.getCheckIns(for: building.id)
-                
-                let (buildings, ovals) = try await (buildingTask, ovalTask)
+                // 只加载建筑的check-in记录
+                let buildings = try await BuildingCheckInManager.shared.getCheckIns(for: building.id)
                 
                 await MainActor.run {
                     self.buildingRecords = buildings.sorted { $0.createdAt > $1.createdAt }
-                    self.ovalRecords = ovals.sorted { $0.createdAt > $1.createdAt }
                     self.isLoading = false
                 }
                 
-                Logger.success("✅ Loaded \(buildings.count) building records + \(ovals.count) oval records")
+                Logger.success("✅ Loaded \(buildings.count) building records for \(building.name)")
             } catch {
                 Logger.error("❌ Failed to load building history: \(error.localizedDescription)")
                 await MainActor.run {
