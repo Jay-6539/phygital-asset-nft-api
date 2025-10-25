@@ -235,11 +235,19 @@ struct MarketView: View {
         }
         // Bid List overlay
         .fullScreenCover(isPresented: $showBidList) {
-            // TODO: 实现BidListView
-            Text("Bid List View - Coming Soon")
-                .onTapGesture {
-                    showBidList = false
-                }
+            if let username = currentUsername {
+                BidListView(
+                    appGreen: appGreen,
+                    currentUsername: username,
+                    onClose: {
+                        showBidList = false
+                        // 刷新未读计数
+                        Task {
+                            await loadUnreadBidCount()
+                        }
+                    }
+                )
+            }
         }
     }
     
