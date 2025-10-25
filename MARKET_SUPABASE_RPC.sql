@@ -118,7 +118,7 @@ BEGIN
             ), 0
         ) as transfer_count,
         ac.created_at,
-        ac.notes
+        ac.description as notes  -- asset_checkins表中字段是description
     FROM asset_checkins ac
     WHERE ac.id::text IN (
         -- 只选择有转账记录的check-ins
