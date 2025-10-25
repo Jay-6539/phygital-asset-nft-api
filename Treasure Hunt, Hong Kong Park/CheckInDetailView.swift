@@ -19,6 +19,7 @@ struct CheckInDetailView: View {
     @State private var showTransferView = false
     @State private var transferRequest: TransferRequest?
     @State private var isCreatingTransfer = false
+    @State private var showBidInput = false
     
     var body: some View {
         ZStack {
@@ -239,8 +240,8 @@ struct CheckInDetailView: View {
                         // Bid按钮（只在非拥有者时显示）
                         if currentUsername != checkIn.username {
                             Button(action: {
-                                Logger.debug("🎯 Bid button tapped (功能待实现)")
-                                // TODO: 实现Bid功能
+                                Logger.debug("🎯 Bid button tapped")
+                                showBidInput = true
                             }) {
                                 HStack(spacing: 12) {
                                     Image(systemName: "gavel.fill")
@@ -308,6 +309,24 @@ struct CheckInDetailView: View {
                         showTransferView = false
                         transferRequest = nil
                         onClose()
+                    }
+                )
+            }
+            
+            // Bid输入界面overlay
+            if showBidInput {
+                BidInputView(
+                    recordId: checkIn.id,
+                    recordType: "building",
+                    buildingId: checkIn.buildingId,
+                    ownerUsername: checkIn.username,
+                    recordDescription: checkIn.description,
+                    appGreen: appGreen,
+                    onClose: {
+                        showBidInput = false
+                    },
+                    onSuccess: {
+                        Logger.success("✅ Bid submitted successfully!")
                     }
                 )
             }
