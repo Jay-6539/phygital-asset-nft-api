@@ -119,7 +119,7 @@ struct MyBidsView: View {
                                 .fill(appGreen.opacity(0.1))
                                 .frame(width: 100, height: 100)
                             
-                            Image(systemName: "gavel")
+                            Image(systemName: "dollarsign.circle")
                                 .font(.system(size: 48))
                                 .foregroundColor(appGreen.opacity(0.6))
                         }

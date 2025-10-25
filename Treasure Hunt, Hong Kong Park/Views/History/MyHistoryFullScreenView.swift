@@ -131,7 +131,7 @@ struct MyHistoryFullScreenView: View {
                             showMyBids = true
                         }) {
                             HStack(spacing: 6) {
-                                Image(systemName: "gavel.fill")
+                                Image(systemName: "dollarsign.circle.fill")
                                     .font(.system(size: 14))
                                 Text("My Bids")
                                     .font(.system(size: 14, weight: .semibold))

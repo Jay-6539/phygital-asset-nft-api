@@ -244,7 +244,7 @@ struct CheckInDetailView: View {
                                 showBidInput = true
                             }) {
                                 HStack(spacing: 12) {
-                                    Image(systemName: "gavel.fill")
+                                    Image(systemName: "dollarsign.circle.fill")
                                         .font(.system(size: 16))
                                     
                                     Text("Bid")

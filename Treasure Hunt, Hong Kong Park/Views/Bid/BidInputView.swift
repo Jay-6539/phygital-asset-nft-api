@@ -146,18 +146,18 @@ struct BidInputView: View {
                     .disabled(isSubmitting)
                     
                     Button(action: submitBid) {
-                        HStack(spacing: 8) {
-                            if isSubmitting {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                            } else {
-                                Image(systemName: "gavel.fill")
-                                    .font(.system(size: 16))
-                                
-                                Text("Submit Bid")
-                                    .font(.headline)
+                            HStack(spacing: 8) {
+                                if isSubmitting {
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                } else {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.system(size: 16))
+                                    
+                                    Text("Submit Bid")
+                                        .font(.headline)
+                                }
                             }
-                        }
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .padding()
