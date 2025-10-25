@@ -792,7 +792,7 @@ struct MyBidDetailView: View {
     }
     
     var hasUpdate: Bool {
-        bid.status == .countered || bid.status == .accepted
+        bid.status == .countered || bid.status == .accepted || bid.status == .completed
     }
     
     private func acceptCounter(contact: String) {
@@ -848,12 +848,12 @@ struct AcceptCounterOfferView: View {
             VStack(spacing: 20) {
                 ZStack {
                     Circle()
-                        .fill(Color.blue.opacity(0.2))
+                        .fill((bid.status == .accepted ? appGreen : Color.blue).opacity(0.2))
                         .frame(width: 80, height: 80)
                     
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 40))
-                        .foregroundColor(.blue)
+                        .foregroundColor(bid.status == .accepted ? appGreen : .blue)
                 }
                 
                 Text(bid.status == .accepted ? "Confirm Trade?" : "Accept Counter Offer?")
@@ -904,14 +904,14 @@ struct AcceptCounterOfferView: View {
                 HStack(spacing: 8) {
                     Image(systemName: "info.circle.fill")
                         .font(.caption)
-                        .foregroundColor(.blue)
+                        .foregroundColor(bid.status == .accepted ? appGreen : .blue)
                     
                     Text("You'll receive @\(bid.ownerUsername)'s contact info to arrange offline trade.")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
                 .padding(12)
-                .background(Color.blue.opacity(0.1))
+                .background((bid.status == .accepted ? appGreen : Color.blue).opacity(0.1))
                 .cornerRadius(8)
                 
                 // 按钮
@@ -925,12 +925,12 @@ struct AcceptCounterOfferView: View {
                     .foregroundColor(.primary)
                     .cornerRadius(12)
                     
-                    Button("Accept & Share") {
+                    Button("Accept") {
                         onSubmit(contactInfo)
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(contactInfo.isEmpty ? Color.gray : Color.blue)
+                    .background(contactInfo.isEmpty ? Color.gray : (bid.status == .accepted ? appGreen : Color.blue))
                     .foregroundColor(.white)
                     .cornerRadius(12)
                     .disabled(contactInfo.isEmpty)

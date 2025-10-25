@@ -263,7 +263,7 @@ struct BidDetailView: View {
                                         .font(.subheadline)
                                         .fontWeight(.semibold)
                                 }
-                                .foregroundColor(.red)
+                                .foregroundColor(appGreen)
                                 .frame(maxWidth: .infinity)
                                 .padding()
                                 .background(Color(.systemGray6))
