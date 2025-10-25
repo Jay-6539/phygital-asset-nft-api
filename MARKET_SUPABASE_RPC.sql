@@ -87,6 +87,9 @@ $$ LANGUAGE plpgsql;
 
 -- 4. 获取交易最多的记录
 -- ============================================================================
+-- 先删除旧函数（如果存在），因为返回类型已更改
+DROP FUNCTION IF EXISTS get_most_traded_records(INT);
+
 CREATE OR REPLACE FUNCTION get_most_traded_records(record_limit INT DEFAULT 20)
 RETURNS TABLE (
     id UUID,
