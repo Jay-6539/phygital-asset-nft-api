@@ -194,7 +194,7 @@ struct CheckInDetailView: View {
                                         ProgressView()
                                             .progressViewStyle(CircularProgressViewStyle(tint: appGreen))
                                     } else {
-                                        Text("Transfer")
+                                        Text("Sell")
                                             .font(.headline)
                                             .foregroundColor(appGreen)
                                     }
@@ -240,7 +240,7 @@ struct CheckInDetailView: View {
                 }
             }
             .frame(maxWidth: 400)
-            .frame(maxHeight: 600)
+            .frame(maxHeight: 700)
             .background(Color(.systemBackground))
             .cornerRadius(20)
             .shadow(radius: 20)

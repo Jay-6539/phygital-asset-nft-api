@@ -126,8 +126,8 @@ struct AssetHistoryView: View {
         Logger.debug("   NFC: \(nfcCoordinate)")
         Logger.debug("   Distance: \(String(format: "%.2f", distance)) meters")
         Logger.debug("   isFirstRegistration: \(isFirstRegistration)")
-        Logger.debug("   Match: \(distance < 30.0 ? "✅ YES" : "❌ NO") (< 30m)")
+        Logger.debug("   Match: \(distance < 40.0 ? "✅ YES" : "❌ NO") (< 40m)")
         
-        return distance < 30.0 // 小于30米
+        return distance < 40.0 // 小于40米
     }
 }

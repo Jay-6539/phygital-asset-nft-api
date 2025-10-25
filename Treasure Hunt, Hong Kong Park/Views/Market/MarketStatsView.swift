@@ -16,22 +16,22 @@ struct MarketStatsView: View {
             StatCard(
                 title: "Buildings",
                 value: "\(stats.totalBuildings)",
-                icon: "building.2.fill",
+                icon: "building.2",
                 color: appGreen
             )
             
             StatCard(
                 title: "Records",
                 value: "\(stats.totalRecords)",
-                icon: "chart.bar.fill",
-                color: .blue
+                icon: "doc.text",
+                color: appGreen
             )
             
             StatCard(
                 title: "Active Users",
                 value: "\(stats.activeUsers)",
-                icon: "person.3.fill",
-                color: .orange
+                icon: "person.2",
+                color: appGreen
             )
         }
         .padding(.horizontal, 16)

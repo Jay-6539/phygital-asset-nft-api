@@ -2189,8 +2189,8 @@ struct ContentView: View {
                     }
                 }
             
-            // 右下角三个小按钮 - 只在不显示Buy界面时显示
-            if !showReceiveTransferFromMap {
+            // 右下角三个小按钮 - 只在不显示Buy界面和clue hint时显示
+            if !showReceiveTransferFromMap && !showClue {
                 VStack(spacing: 10) {
                     // 指南针按钮 - 定位到用户位置
                     Button(action: { 
@@ -4007,17 +4007,17 @@ struct ContentView: View {
                             Logger.debug("   Building Coordinate: \(building.coordinate)")
                             Logger.debug("   NFC Tag Coordinate: \(nfcCoord)")
                             Logger.debug("   Distance: \(String(format: "%.2f", distance)) meters")
-                            Logger.debug("   Threshold: 30.0 meters")
+                            Logger.debug("   Threshold: 40.0 meters")
                             
-                            if distance < 30.0 {
+                            if distance < 40.0 {
                                 // GPS坐标匹配，保存check-in数据
-                                Logger.success("GPS coordinates MATCH! Distance \(String(format: "%.2f", distance))m < 30m")
+                                Logger.success("GPS coordinates MATCH! Distance \(String(format: "%.2f", distance))m < 40m")
                                 Logger.success("Proceeding to save check-in data...")
                                 saveCheckInData(for: building)
                                 closeCheckInModal()
                             } else {
                                 // GPS坐标不匹配，显示错误提示
-                                Logger.error("GPS coordinates MISMATCH! Distance \(String(format: "%.2f", distance))m >= 30m")
+                                Logger.error("GPS coordinates MISMATCH! Distance \(String(format: "%.2f", distance))m >= 40m")
                                 Logger.error("Showing GPS mismatch error modal...")
                                 showGPSErrorModal()
                             }
