@@ -16,6 +16,34 @@ class BidManager {
         Logger.debug("💰 Creating bid: \(request.bidAmount) credits for record \(request.recordId)")
         Logger.debug("📝 Bidder: '\(bidderUsername)' -> Owner: '\(request.ownerUsername)'")
         
+        // 检查是否已有active Bid（防止重复出价）
+        Logger.debug("🔍 Checking for existing bids...")
+        let checkEndpoint = "bids?record_id=eq.\(request.recordId.uuidString)&bidder_username=eq.\(bidderUsername)&status=in.(pending,countered)"
+        
+        let checkData = try await NetworkManager.shared.request(
+            url: URL(string: "\(SupabaseConfig.url)/rest/v1/\(checkEndpoint)")!,
+            method: "GET",
+            headers: [
+                "apikey": SupabaseConfig.anonKey,
+                "Authorization": "Bearer \(SupabaseConfig.anonKey)"
+            ],
+            timeout: 30,
+            retries: 2
+        )
+        
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let existingBids = try decoder.decode([Bid].self, from: checkData)
+        
+        if !existingBids.isEmpty {
+            Logger.warning("⚠️ User already has an active bid for this asset")
+            throw NSError(domain: "BidManager", code: -2, userInfo: [
+                NSLocalizedDescriptionKey: "You already have an active bid for this asset. Please wait for the seller's response or cancel your existing bid."
+            ])
+        }
+        
+        Logger.debug("✅ No existing bids found, proceeding to create new bid")
+        
         let bidData: [String: Any] = [
             "record_id": request.recordId.uuidString,
             "record_type": request.recordType,
@@ -154,12 +182,18 @@ class BidManager {
     func counterOffer(bidId: UUID, counterAmount: Int, message: String?) async throws {
         Logger.debug("🔄 Counter offer: \(counterAmount) credits for bid \(bidId)")
         
+        // Counter后重置过期时间为7天，给买家足够时间回应
+        let newExpiresAt = Date().addingTimeInterval(7 * 24 * 60 * 60)
+        
         let updateData: [String: Any] = [
             "counter_amount": counterAmount,
             "owner_message": message as Any,
             "status": "countered",
-            "updated_at": ISO8601DateFormatter().string(from: Date())
+            "updated_at": ISO8601DateFormatter().string(from: Date()),
+            "expires_at": ISO8601DateFormatter().string(from: newExpiresAt)
         ]
+        
+        Logger.debug("⏰ Expires at reset to: \(newExpiresAt)")
         
         let jsonData = try JSONSerialization.data(withJSONObject: updateData)
         
@@ -456,6 +490,43 @@ class BidManager {
         for bid in otherBids {
             Logger.debug("   ❌ Rejected bid from @\(bid.bidderUsername) (\(bid.bidAmount) credits)")
         }
+    }
+    
+    // MARK: - 撤回Bid（买家）
+    func cancelBid(bidId: UUID) async throws {
+        Logger.debug("🔙 Cancelling bid: \(bidId)")
+        
+        // 先查询bid状态，确保只有pending可以撤回
+        let bidData = try await getBidDetail(bidId: bidId)
+        
+        guard bidData.status == .pending else {
+            Logger.warning("⚠️ Cannot cancel bid with status: \(bidData.status.rawValue)")
+            throw NSError(domain: "BidManager", code: -3, userInfo: [
+                NSLocalizedDescriptionKey: "Only pending bids can be cancelled. This bid is already \(bidData.status.displayName.lowercased())."
+            ])
+        }
+        
+        let updateData: [String: Any] = [
+            "status": "cancelled",
+            "updated_at": ISO8601DateFormatter().string(from: Date())
+        ]
+        
+        let jsonData = try JSONSerialization.data(withJSONObject: updateData)
+        
+        _ = try await NetworkManager.shared.request(
+            url: URL(string: "\(SupabaseConfig.url)/rest/v1/bids?id=eq.\(bidId.uuidString)")!,
+            method: "PATCH",
+            headers: [
+                "apikey": SupabaseConfig.anonKey,
+                "Authorization": "Bearer \(SupabaseConfig.anonKey)",
+                "Content-Type": "application/json"
+            ],
+            body: jsonData,
+            timeout: 30,
+            retries: 3
+        )
+        
+        Logger.success("✅ Bid cancelled successfully")
     }
     
     // MARK: - 拒绝Bid

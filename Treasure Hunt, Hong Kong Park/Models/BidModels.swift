@@ -61,6 +61,7 @@ enum BidStatus: String, Codable {
     case accepted = "accepted"      // 双方接受
     case completed = "completed"    // 已完成交易
     case rejected = "rejected"      // 已拒绝
+    case cancelled = "cancelled"    // 买家撤回
     case expired = "expired"        // 已过期
     
     var displayName: String {
@@ -70,6 +71,7 @@ enum BidStatus: String, Codable {
         case .accepted: return "Accepted"
         case .completed: return "Completed"
         case .rejected: return "Rejected"
+        case .cancelled: return "Cancelled"
         case .expired: return "Expired"
         }
     }
@@ -81,6 +83,7 @@ enum BidStatus: String, Codable {
         case .accepted: return "green"
         case .completed: return "gray"
         case .rejected: return "red"
+        case .cancelled: return "gray"
         case .expired: return "gray"
         }
     }

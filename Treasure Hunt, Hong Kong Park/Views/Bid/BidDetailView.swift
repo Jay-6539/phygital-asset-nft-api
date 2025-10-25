@@ -464,6 +464,19 @@ struct CounterOfferView: View {
     @State private var counterAmount: String = ""
     @State private var message: String = ""
     
+    var canSubmit: Bool {
+        guard let amount = Int(counterAmount) else { return false }
+        return amount > 0 && amount != originalBid && !message.isEmpty
+    }
+    
+    var validationMessage: String? {
+        guard let amount = Int(counterAmount), amount > 0 else { return nil }
+        if amount == originalBid {
+            return "Counter must be different from original bid"
+        }
+        return nil
+    }
+    
     var body: some View {
         ZStack {
             Color.black.opacity(0.6)
@@ -518,6 +531,18 @@ struct CounterOfferView: View {
                         .cornerRadius(12)
                 }
                 
+                // 验证提示
+                if let validationMsg = validationMessage {
+                    HStack(spacing: 6) {
+                        Image(systemName: "exclamationmark.circle.fill")
+                            .font(.caption)
+                        Text(validationMsg)
+                            .font(.caption)
+                    }
+                    .foregroundColor(.red)
+                    .padding(.horizontal, 4)
+                }
+                
                 // 按钮
                 HStack(spacing: 12) {
                     Button("Cancel") {
@@ -530,16 +555,16 @@ struct CounterOfferView: View {
                     .cornerRadius(12)
                     
                     Button("Send") {
-                        if let amount = Int(counterAmount), amount > 0 {
+                        if let amount = Int(counterAmount), canSubmit {
                             onSubmit(amount, message.isEmpty ? nil : message)
                         }
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(counterAmount.isEmpty ? Color.gray : appGreen)
+                    .background(canSubmit ? appGreen : Color.gray)
                     .foregroundColor(.white)
                     .cornerRadius(12)
-                    .disabled(counterAmount.isEmpty)
+                    .disabled(!canSubmit)
                 }
             }
             .padding(24)

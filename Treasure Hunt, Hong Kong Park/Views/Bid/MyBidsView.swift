@@ -624,7 +624,35 @@ struct MyBidDetailView: View {
                 Divider()
                 
                 // 底部按钮
-                if bid.status == .countered {
+                if bid.status == .pending {
+                    // Pending状态 - 显示Cancel按钮
+                    VStack(spacing: 12) {
+                        Button(action: {
+                            cancelBid()
+                        }) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 16))
+                                
+                                Text("Cancel Bid")
+                                    .font(.headline)
+                            }
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.red)
+                            .cornerRadius(12)
+                        }
+                        .disabled(isProcessing)
+                        
+                        Text("Waiting for seller's response...")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .padding(.vertical, 8)
+                    }
+                    .padding(20)
+                    .background(Color(.systemBackground))
+                } else if bid.status == .countered {
                     VStack(spacing: 12) {
                         // 接受反价按钮
                         Button(action: {
@@ -793,6 +821,29 @@ struct MyBidDetailView: View {
     
     var hasUpdate: Bool {
         bid.status == .countered || bid.status == .accepted || bid.status == .completed
+    }
+    
+    private func cancelBid() {
+        isProcessing = true
+        
+        Task {
+            do {
+                try await BidManager.shared.cancelBid(bidId: bid.id)
+                
+                await MainActor.run {
+                    isProcessing = false
+                    onActionCompleted()
+                    onClose()
+                }
+            } catch {
+                Logger.error("Failed to cancel bid: \(error)")
+                await MainActor.run {
+                    isProcessing = false
+                    errorMessage = error.localizedDescription
+                    showError = true
+                }
+            }
+        }
     }
     
     private func acceptCounter(contact: String) {

@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS bids (
     
     -- 状态管理
     status TEXT NOT NULL DEFAULT 'pending' CHECK (
-        status IN ('pending', 'countered', 'accepted', 'completed', 'rejected', 'expired')
+        status IN ('pending', 'countered', 'accepted', 'completed', 'rejected', 'cancelled', 'expired')
     ),
     
     -- 时间戳
@@ -246,7 +246,7 @@ COMMENT ON COLUMN bids.bidder_username IS '出价者用户名';
 COMMENT ON COLUMN bids.owner_username IS '记录拥有者用户名';
 COMMENT ON COLUMN bids.bid_amount IS '出价金额（credits）';
 COMMENT ON COLUMN bids.counter_amount IS '卖家反价金额';
-COMMENT ON COLUMN bids.status IS '状态: pending/countered/accepted/completed/rejected/expired';
+COMMENT ON COLUMN bids.status IS '状态: pending/countered/accepted/completed/rejected/cancelled/expired';
 
 -- ============================================================================
 -- 测试查询
