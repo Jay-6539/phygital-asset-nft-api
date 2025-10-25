@@ -79,7 +79,7 @@ struct ReceiveTransferView: View {
                 }
             }
             .frame(maxWidth: 450)
-            .frame(maxHeight: .infinity)
+            .frame(maxHeight: 600)
             .background(Color(.systemBackground))
             .cornerRadius(16)
             .shadow(radius: 20)
