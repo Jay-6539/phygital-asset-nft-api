@@ -44,16 +44,9 @@ struct MarketView: View {
                 
                 Spacer()
                 
-                VStack(spacing: 2) {
-                    Text("Market")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                    
-                    // 调试信息
-                    Text("B:\(trendingBuildings.count) U:\(topUsers.count)")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                }
+                Text("Market")
+                    .font(.title2)
+                    .fontWeight(.bold)
                 
                 Spacer()
                 
@@ -93,7 +86,8 @@ struct MarketView: View {
                 }
             }
             .padding(.horizontal, 20)
-            .padding(.vertical, 16)
+            .padding(.top, 20)
+            .padding(.bottom, 16)
             .background(Color(.systemBackground))
             
             Divider()

@@ -25,6 +25,8 @@ struct BidManagementView: View {
     let onClose: () -> Void
     
     @State private var selectedTab: BidTab = .received
+    @State private var unreadReceivedCount: Int = 0
+    @State private var unreadOffersCount: Int = 0
     
     var body: some View {
         ZStack {
@@ -75,6 +77,29 @@ struct BidManagementView: View {
                                     Text(tab.rawValue)
                                         .font(.subheadline)
                                         .fontWeight(.semibold)
+                                    
+                                    // 未读/未处理数量徽章
+                                    if tab == .received && unreadReceivedCount > 0 {
+                                        ZStack {
+                                            Circle()
+                                                .fill(appGreen.opacity(0.5))
+                                                .frame(width: 18, height: 18)
+                                            
+                                            Text("\(unreadReceivedCount)")
+                                                .font(.system(size: 10, weight: .bold))
+                                                .foregroundColor(.white)
+                                        }
+                                    } else if tab == .offers && unreadOffersCount > 0 {
+                                        ZStack {
+                                            Circle()
+                                                .fill(Color.blue)
+                                                .frame(width: 18, height: 18)
+                                            
+                                            Text("\(unreadOffersCount)")
+                                                .font(.system(size: 10, weight: .bold))
+                                                .foregroundColor(.white)
+                                        }
+                                    }
                                 }
                                 .foregroundColor(selectedTab == tab ? appGreen : .secondary)
                                 
@@ -97,13 +122,19 @@ struct BidManagementView: View {
                     case .received:
                         BidListViewContent(
                             appGreen: appGreen,
-                            currentUsername: currentUsername
+                            currentUsername: currentUsername,
+                            onCountUpdate: { count in
+                                unreadReceivedCount = count
+                            }
                         )
                         
                     case .offers:
                         MyBidsViewContent(
                             appGreen: appGreen,
-                            currentUsername: currentUsername
+                            currentUsername: currentUsername,
+                            onCountUpdate: { count in
+                                unreadOffersCount = count
+                            }
                         )
                     }
                 }
@@ -117,6 +148,7 @@ struct BidManagementView: View {
 struct BidListViewContent: View {
     let appGreen: Color
     let currentUsername: String
+    let onCountUpdate: ((Int) -> Void)?
     
     @State private var receivedBids: [Bid] = []
     @State private var isLoading = false
@@ -231,18 +263,23 @@ struct BidListViewContent: View {
         do {
             let bids = try await BidManager.shared.getReceivedBids(ownerUsername: currentUsername)
             
+            // 计算未读数量（pending状态）
+            let unreadCount = bids.filter { $0.status == .pending }.count
+            
             await MainActor.run {
                 self.receivedBids = bids
                 self.isLoading = false
+                onCountUpdate?(unreadCount)
             }
             
-            Logger.success("✅ Loaded \(bids.count) received bids")
+            Logger.success("✅ Loaded \(bids.count) received bids, \(unreadCount) unread")
         } catch {
             Logger.error("❌ Failed to load bids: \(error.localizedDescription)")
             
             await MainActor.run {
                 self.errorMessage = error.localizedDescription
                 self.isLoading = false
+                onCountUpdate?(0)
             }
         }
     }
@@ -252,6 +289,7 @@ struct BidListViewContent: View {
 struct MyBidsViewContent: View {
     let appGreen: Color
     let currentUsername: String
+    let onCountUpdate: ((Int) -> Void)?
     
     @State private var sentBids: [Bid] = []
     @State private var isLoading = false
@@ -366,18 +404,23 @@ struct MyBidsViewContent: View {
         do {
             let bids = try await BidManager.shared.getSentBids(bidderUsername: currentUsername)
             
+            // 计算未处理counter数量（countered状态）
+            let unreadCount = bids.filter { $0.status == .countered }.count
+            
             await MainActor.run {
                 self.sentBids = bids
                 self.isLoading = false
+                onCountUpdate?(unreadCount)
             }
             
-            Logger.success("✅ Loaded \(bids.count) sent bids")
+            Logger.success("✅ Loaded \(bids.count) sent bids, \(unreadCount) need response")
         } catch {
             Logger.error("❌ Failed to load sent bids: \(error.localizedDescription)")
             
             await MainActor.run {
                 self.errorMessage = error.localizedDescription
                 self.isLoading = false
+                onCountUpdate?(0)
             }
         }
     }
