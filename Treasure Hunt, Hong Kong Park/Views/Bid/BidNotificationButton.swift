@@ -20,18 +20,18 @@ struct BidNotificationButton: View {
                     Circle()
                         .fill(Color.white)
                     
-                    Image(systemName: unreadCount > 0 ? "bell.badge.fill" : "bell.fill")
+                    Image(systemName: "bell.fill")
                         .font(.system(size: 16))
                         .foregroundStyle(unreadCount > 0 ? appGreen : .gray)
                 }
                 .frame(width: 36, height: 36)
                 .shadow(radius: 2)
                 
-                // 红点徽章
+                // 绿色数字徽章
                 if unreadCount > 0 {
                     ZStack {
                         Circle()
-                            .fill(Color.red)
+                            .fill(appGreen)
                             .frame(width: 18, height: 18)
                         
                         if unreadCount < 100 {
@@ -45,6 +45,7 @@ struct BidNotificationButton: View {
                         }
                     }
                     .offset(x: 4, y: -4)
+                    .shadow(color: appGreen.opacity(0.3), radius: 2, x: 0, y: 1)
                 }
             }
         }
