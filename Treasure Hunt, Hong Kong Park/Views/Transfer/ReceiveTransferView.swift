@@ -78,10 +78,13 @@ struct ReceiveTransferView: View {
                     transferConfirmationView(data: data)
                 }
             }
-            .frame(maxWidth: 400, maxHeight: 650)
+            .frame(maxWidth: 450)
+            .frame(maxHeight: .infinity)
             .background(Color(.systemBackground))
-            .cornerRadius(20)
+            .cornerRadius(16)
             .shadow(radius: 20)
+            .padding(.horizontal, 24)
+            .padding(.vertical, 40)
         }
         .alert("Error", isPresented: $showError) {
             Button("OK") {
@@ -115,17 +118,46 @@ struct ReceiveTransferView: View {
             
             Spacer()
             
-            // 扫描按钮
+            // 扫描按钮（绿色frosted glass样式）
             Button(action: {
                 showCameraScanner = true
             }) {
                 Text("Start Scanning")
                     .font(.headline)
-                    .foregroundColor(.white)
+                    .foregroundColor(appGreen)
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(appGreen)
+                    .background {
+                        ZStack {
+                            Color.clear.background(.ultraThinMaterial)
+                            LinearGradient(
+                                gradient: Gradient(colors: [
+                                    appGreen.opacity(0.15),
+                                    appGreen.opacity(0.05)
+                                ]),
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        }
+                    }
                     .cornerRadius(12)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .strokeBorder(
+                                LinearGradient(
+                                    gradient: Gradient(stops: [
+                                        .init(color: Color.white.opacity(0.6), location: 0.0),
+                                        .init(color: Color.white.opacity(0.0), location: 0.3),
+                                        .init(color: appGreen.opacity(0.2), location: 0.7),
+                                        .init(color: appGreen.opacity(0.4), location: 1.0)
+                                    ]),
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 1.5
+                            )
+                    )
+                    .shadow(color: appGreen.opacity(0.2), radius: 4, x: 0, y: 2)
             }
             .padding(.horizontal, 24)
             .padding(.bottom, 24)
