@@ -1241,6 +1241,7 @@ struct ContentView: View {
     @State private var showReceiveTransferFromMap: Bool = false  // 是否显示接收转让界面（从地图按钮）
     @State private var showOvalOfficeHistory: Bool = false  // 是否显示Oval Office历史记录modal
     @State private var showBottomMenu: Bool = false  // 是否显示底部按钮的扇形菜单
+    @State private var showMarket: Bool = false  // 是否显示Market页面
     
     @State private var routePolyline: MKPolyline? = nil
     @State private var routeDistanceMeters: CLLocationDistance? = nil
@@ -2330,7 +2331,11 @@ struct ContentView: View {
                                 showBottomMenu = false
                             }
                             
-                            // TODO: 添加Market功能
+                            // 打开Market页面
+                            showMap = false
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                showMarket = true
+                            }
                         }) {
                             VStack(spacing: 4) {
                                 Circle()
@@ -5352,6 +5357,39 @@ struct ContentView: View {
             }
             .fullScreenCover(isPresented: $showMyHistory) {
                 myHistoryFullScreenView
+            }
+            .fullScreenCover(isPresented: $showMarket) {
+                MarketView(
+                    appGreen: appGreen,
+                    treasures: treasures,
+                    onClose: {
+                        showMarket = false
+                        showMap = true
+                    },
+                    onNavigateToBuilding: { buildingId in
+                        // 关闭Market，打开地图并定位到建筑
+                        showMarket = false
+                        
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            showMap = true
+                            
+                            // 查找并选中建筑
+                            if let building = treasures.first(where: { $0.id == buildingId }) {
+                                selectedTreasure = building
+                                
+                                // 放大到建筑位置
+                                let region = MKCoordinateRegion(
+                                    center: building.coordinate,
+                                    span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+                                )
+                                withAnimation(.easeInOut(duration: 0.5)) {
+                                    currentRegion = region
+                                    cameraPosition = .region(region)
+                                }
+                            }
+                        }
+                    }
+                )
             }
     }
 }

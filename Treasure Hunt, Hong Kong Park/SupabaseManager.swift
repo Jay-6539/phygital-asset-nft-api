@@ -119,6 +119,13 @@ class SupabaseManager: ObservableObject {
         Logger.network("Connected to: \(baseURL)")
     }
     
+    // MARK: - 公开查询方法
+    
+    /// 公开的通用查询方法 - 用于Market等需要自定义查询的场景
+    func query(endpoint: String) async throws -> Data {
+        return try await makeRequest(endpoint: endpoint, method: "GET")
+    }
+    
     // MARK: - 网络请求辅助方法
     
     private func makeRequest(
