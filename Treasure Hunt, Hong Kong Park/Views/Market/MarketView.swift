@@ -81,12 +81,9 @@ struct MarketView: View {
             // MARK: - 统计卡片区
             if isLoading && marketStats.totalBuildings == 0 {
                 HStack(spacing: 12) {
-                    ForEach(0..<3, id: \.self) { _ in
-                        Rectangle()
-                            .fill(Color.gray.opacity(0.1))
-                            .frame(height: 80)
-                            .cornerRadius(12)
-                    }
+                    StatCardSkeleton()
+                    StatCardSkeleton()
+                    StatCardSkeleton()
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
@@ -118,15 +115,18 @@ struct MarketView: View {
             
             // MARK: - 内容区域
             if isLoading {
-                VStack(spacing: 16) {
-                    ProgressView()
-                        .scaleEffect(1.5)
-                    
-                    Text("Loading market data...")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
+                ScrollView {
+                    LazyVStack(spacing: 12) {
+                        ForEach(0..<5, id: \.self) { _ in
+                            if selectedTab == .topUsers {
+                                UserRowSkeleton()
+                            } else {
+                                BuildingCardSkeleton()
+                            }
+                        }
+                    }
+                    .padding(16)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let errorMessage = errorMessage {
                 VStack(spacing: 16) {
                     Image(systemName: "exclamationmark.triangle")
@@ -205,38 +205,22 @@ struct MarketView: View {
     
     // MARK: - 加载Market数据
     private func loadMarketData() async {
-        Logger.debug("🔄 Starting to load market data...")
         isLoading = true
         errorMessage = nil
         
         do {
             // 并行加载所有数据
-            Logger.debug("📊 Loading stats...")
             async let statsTask = MarketDataManager.shared.fetchMarketStats()
+            async let buildingsTask = MarketDataManager.shared.fetchTrendingBuildings(limit: 20)
+            async let usersTask = MarketDataManager.shared.fetchTopUsers(limit: 20)
+            async let tradedTask = MarketDataManager.shared.fetchMostTradedRecords(limit: 20)
             
-            Logger.debug("🔥 Loading trending buildings...")
-            async let buildingsTask = MarketDataManager.shared.fetchTrendingBuildingsFallback(limit: 20)
-            
-            Logger.debug("👑 Loading top users...")
-            async let usersTask = MarketDataManager.shared.fetchTopUsersFallback(limit: 20)
-            
-            let (stats, buildings, users) = try await (statsTask, buildingsTask, usersTask)
-            
-            Logger.debug("📈 Received stats: \(stats.totalBuildings) buildings, \(stats.totalRecords) records, \(stats.activeUsers) users")
-            Logger.debug("🏛️ Received \(buildings.count) trending buildings")
-            Logger.debug("👥 Received \(users.count) top users")
+            let (stats, buildings, users, traded) = try await (statsTask, buildingsTask, usersTask, tradedTask)
             
             // 匹配真实建筑名称
-            Logger.debug("🔍 Matching buildings with treasures...")
-            Logger.debug("   Buildings to match: \(buildings.count)")
-            Logger.debug("   Available treasures: \(treasures.count)")
-            
             var enrichedBuildings = buildings
             for (index, building) in enrichedBuildings.enumerated() {
-                Logger.debug("   Checking building ID: \(building.id)")
-                
                 if let treasure = treasures.first(where: { $0.id == building.id }) {
-                    Logger.success("   ✅ Matched building \(building.id) -> \(treasure.name)")
                     enrichedBuildings[index] = BuildingWithStats(
                         id: building.id,
                         name: treasure.name,
@@ -246,32 +230,21 @@ struct MarketView: View {
                         lastActivityTime: building.lastActivityTime,
                         rank: building.rank
                     )
-                } else {
-                    Logger.warning("   ⚠️ No treasure found for building ID: \(building.id) - keeping original name")
-                    // 保留原建筑数据，即使没有匹配到treasure
-                    // 这样至少可以看到数据
                 }
             }
-            
-            Logger.debug("🎯 Final enriched buildings count: \(enrichedBuildings.count)")
             
             await MainActor.run {
                 self.marketStats = stats
                 self.trendingBuildings = enrichedBuildings
                 self.topUsers = users
-                self.mostTradedRecords = [] // TODO: 实现后填充
+                self.mostTradedRecords = traded
                 self.isLoading = false
             }
             
-            Logger.success("✅ Market data loaded successfully")
-            Logger.success("   Stats: \(stats.totalBuildings) buildings, \(stats.totalRecords) records")
-            Logger.success("   Trending: \(enrichedBuildings.count) buildings")
-            Logger.success("   Top Users: \(users.count) users")
+            Logger.success("✅ Market data loaded: \(stats.totalBuildings) buildings, \(enrichedBuildings.count) trending, \(users.count) users, \(traded.count) traded")
             
         } catch {
             Logger.error("❌ Failed to load market data: \(error.localizedDescription)")
-            Logger.error("   Error type: \(type(of: error))")
-            Logger.error("   Full error: \(error)")
             
             await MainActor.run {
                 self.errorMessage = error.localizedDescription

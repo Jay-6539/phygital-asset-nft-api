@@ -17,21 +17,31 @@ struct MostTradedView: View {
             LazyVStack(spacing: 12) {
                 if records.isEmpty {
                     // 空状态
-                    VStack(spacing: 16) {
-                        Image(systemName: "arrow.left.arrow.right.circle")
-                            .font(.system(size: 48))
-                            .foregroundColor(.gray.opacity(0.5))
+                    VStack(spacing: 20) {
+                        ZStack {
+                            Circle()
+                                .fill(appGreen.opacity(0.1))
+                                .frame(width: 100, height: 100)
+                            
+                            Image(systemName: "arrow.left.arrow.right.circle")
+                                .font(.system(size: 48))
+                                .foregroundColor(appGreen.opacity(0.6))
+                        }
                         
-                        Text("No traded records yet")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                        
-                        Text("Transfer your assets to see them here!")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                        VStack(spacing: 8) {
+                            Text("No Trades Yet")
+                                .font(.title3)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.primary)
+                            
+                            Text("Use the Sell button to transfer\nyour assets to other collectors!")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                        }
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(.top, 60)
+                    .padding(.top, 80)
                 } else {
                     ForEach(records) { record in
                         MostTradedCard(

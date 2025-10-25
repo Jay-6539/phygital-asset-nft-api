@@ -15,9 +15,31 @@ class MarketDataManager {
     
     // MARK: - 获取Market统计数据
     func fetchMarketStats() async throws -> MarketStats {
-        Logger.debug("📊 Fetching market stats...")
+        // 尝试使用RPC函数（更快）
+        do {
+            let data = try await SupabaseManager.shared.query(endpoint: "rpc/get_market_stats")
+            
+            struct StatsResult: Codable {
+                let total_buildings: Int
+                let total_records: Int
+                let active_users: Int
+            }
+            
+            // RPC返回的是数组，取第一个元素
+            let results = try JSONDecoder().decode([StatsResult].self, from: data)
+            
+            if let result = results.first {
+                return MarketStats(
+                    totalBuildings: result.total_buildings,
+                    totalRecords: result.total_records,
+                    activeUsers: result.active_users
+                )
+            }
+        } catch {
+            Logger.warning("⚠️ RPC function not available, using fallback method")
+        }
         
-        // 从asset_checkins获取所有记录进行统计
+        // Fallback: 客户端统计
         let data = try await SupabaseManager.shared.query(
             endpoint: "asset_checkins?select=building_id,username"
         )
@@ -27,16 +49,11 @@ class MarketDataManager {
             let username: String
         }
         
-        let decoder = JSONDecoder()
-        // 不使用convertFromSnakeCase，因为struct字段名已经是snake_case
-        let records = try decoder.decode([CheckInRecord].self, from: data)
+        let records = try JSONDecoder().decode([CheckInRecord].self, from: data)
         
-        // 统计
         let uniqueBuildings = Set(records.map { $0.building_id }).count
         let totalRecords = records.count
         let activeUsers = Set(records.map { $0.username }).count
-        
-        Logger.success("✅ Market stats: \(uniqueBuildings) buildings, \(totalRecords) records, \(activeUsers) users")
         
         return MarketStats(
             totalBuildings: uniqueBuildings,
@@ -46,26 +63,121 @@ class MarketDataManager {
     }
     
     // MARK: - 获取热门建筑（记录最多）
-    // 注意：此方法需要Supabase RPC函数支持，暂时使用fallback方法
     func fetchTrendingBuildings(limit: Int = 20) async throws -> [BuildingWithStats] {
-        // 暂时使用fallback方法
-        return try await fetchTrendingBuildingsFallback(limit: limit)
+        // 尝试使用RPC函数
+        do {
+            let data = try await SupabaseManager.shared.query(
+                endpoint: "rpc/get_trending_buildings?record_limit=\(limit)"
+            )
+            
+            struct TrendingResult: Codable {
+                let building_id: String
+                let record_count: Int
+                let last_activity: String
+            }
+            
+            let results = try JSONDecoder().decode([TrendingResult].self, from: data)
+            let dateFormatter = ISO8601DateFormatter()
+            
+            var buildings = results.enumerated().map { (index, result) -> BuildingWithStats in
+                BuildingWithStats(
+                    id: result.building_id,
+                    name: "Building \(result.building_id)",
+                    district: "Unknown",
+                    coordinate: CLLocationCoordinate2D(latitude: 0, longitude: 0),
+                    recordCount: result.record_count,
+                    lastActivityTime: dateFormatter.date(from: result.last_activity) ?? Date(),
+                    rank: index + 1
+                )
+            }
+            
+            return buildings
+            
+        } catch {
+            Logger.warning("⚠️ RPC function not available, using fallback")
+            return try await fetchTrendingBuildingsFallback(limit: limit)
+        }
     }
     
     // MARK: - 获取交易最多的记录
-    // 注意：此方法需要Supabase RPC函数支持，暂时返回空数组
     func fetchMostTradedRecords(limit: Int = 20) async throws -> [CheckInWithTransferStats] {
-        Logger.debug("💎 Fetching most traded records...")
-        // TODO: 实现RPC函数后启用
-        Logger.info("⚠️ Most traded records feature not yet implemented")
-        return []
+        // 尝试使用RPC函数
+        do {
+            let data = try await SupabaseManager.shared.query(
+                endpoint: "rpc/get_most_traded_records?record_limit=\(limit)"
+            )
+            
+            struct TradedResult: Codable {
+                let id: String
+                let building_id: String
+                let building_name: String?
+                let image_url: String?
+                let username: String
+                let transfer_count: Int
+                let created_at: String
+                let notes: String?
+            }
+            
+            let results = try JSONDecoder().decode([TradedResult].self, from: data)
+            let dateFormatter = ISO8601DateFormatter()
+            
+            let records = results.map { result -> CheckInWithTransferStats in
+                CheckInWithTransferStats(
+                    id: result.id,
+                    buildingId: result.building_id,
+                    buildingName: result.building_name ?? "Building \(result.building_id)",
+                    imageUrl: result.image_url,
+                    ownerUsername: result.username,
+                    transferCount: result.transfer_count,
+                    createdAt: dateFormatter.date(from: result.created_at) ?? Date(),
+                    notes: result.notes
+                )
+            }
+            
+            return records
+            
+        } catch {
+            Logger.warning("⚠️ RPC function not available or no traded records")
+            // Fallback: 返回空数组
+            return []
+        }
     }
     
     // MARK: - 获取最活跃用户
-    // 注意：此方法需要Supabase RPC函数支持，暂时使用fallback方法
     func fetchTopUsers(limit: Int = 20) async throws -> [UserStats] {
-        // 暂时使用fallback方法
-        return try await fetchTopUsersFallback(limit: limit)
+        // 尝试使用RPC函数
+        do {
+            let data = try await SupabaseManager.shared.query(
+                endpoint: "rpc/get_top_users?user_limit=\(limit)"
+            )
+            
+            struct UserResult: Codable {
+                let username: String
+                let total_records: Int
+                let unique_buildings: Int
+                let transfer_count: Int
+                let activity_score: Int
+            }
+            
+            let results = try JSONDecoder().decode([UserResult].self, from: data)
+            
+            let users = results.enumerated().map { (index, result) -> UserStats in
+                UserStats(
+                    username: result.username,
+                    totalRecords: result.total_records,
+                    uniqueBuildings: result.unique_buildings,
+                    transferCount: result.transfer_count,
+                    activityScore: result.activity_score,
+                    rank: index + 1
+                )
+            }
+            
+            return users
+            
+        } catch {
+            Logger.warning("⚠️ RPC function not available, using fallback")
+            return try await fetchTopUsersFallback(limit: limit)
+        }
     }
     
     // MARK: - 临时方法：从asset_checkins直接查询并统计

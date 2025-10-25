@@ -1,0 +1,181 @@
+-- ============================================================================
+-- Market功能的Supabase RPC函数
+-- 在Supabase SQL Editor中执行这些函数
+-- ============================================================================
+
+-- 1. 获取热门建筑（按记录数排序）
+-- ============================================================================
+CREATE OR REPLACE FUNCTION get_trending_buildings(record_limit INT DEFAULT 20)
+RETURNS TABLE (
+    building_id TEXT,
+    record_count BIGINT,
+    last_activity TIMESTAMP WITH TIME ZONE
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        ac.building_id,
+        COUNT(*) as record_count,
+        MAX(ac.created_at) as last_activity
+    FROM asset_checkins ac
+    GROUP BY ac.building_id
+    ORDER BY record_count DESC
+    LIMIT record_limit;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 测试查询:
+-- SELECT * FROM get_trending_buildings(10);
+
+
+-- 2. 获取最活跃用户
+-- ============================================================================
+CREATE OR REPLACE FUNCTION get_top_users(user_limit INT DEFAULT 20)
+RETURNS TABLE (
+    username TEXT,
+    total_records BIGINT,
+    unique_buildings BIGINT,
+    transfer_count BIGINT,
+    activity_score BIGINT
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        ac.username,
+        COUNT(*) as total_records,
+        COUNT(DISTINCT ac.building_id) as unique_buildings,
+        COALESCE(
+            (SELECT COUNT(*) 
+             FROM transfer_requests tr 
+             WHERE tr.sender_username = ac.username 
+             AND tr.status = 'completed'
+            ), 0
+        ) as transfer_count,
+        (COUNT(*) * 10 + COUNT(DISTINCT ac.building_id) * 50)::BIGINT as activity_score
+    FROM asset_checkins ac
+    GROUP BY ac.username
+    ORDER BY activity_score DESC
+    LIMIT user_limit;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 测试查询:
+-- SELECT * FROM get_top_users(10);
+
+
+-- 3. 获取Market总体统计
+-- ============================================================================
+CREATE OR REPLACE FUNCTION get_market_stats()
+RETURNS TABLE (
+    total_buildings BIGINT,
+    total_records BIGINT,
+    active_users BIGINT
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        COUNT(DISTINCT building_id) as total_buildings,
+        COUNT(*) as total_records,
+        COUNT(DISTINCT username) as active_users
+    FROM asset_checkins;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 测试查询:
+-- SELECT * FROM get_market_stats();
+
+
+-- 4. 获取交易最多的记录
+-- ============================================================================
+CREATE OR REPLACE FUNCTION get_most_traded_records(record_limit INT DEFAULT 20)
+RETURNS TABLE (
+    id TEXT,
+    building_id TEXT,
+    building_name TEXT,
+    image_url TEXT,
+    username TEXT,
+    transfer_count BIGINT,
+    created_at TIMESTAMP WITH TIME ZONE,
+    notes TEXT
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        ac.id,
+        ac.building_id,
+        ''::TEXT as building_name,  -- 将在app中匹配
+        ac.image_url,
+        ac.username,
+        COALESCE(
+            (SELECT COUNT(*) 
+             FROM transfer_requests tr 
+             WHERE tr.asset_checkin_id = ac.id 
+             AND tr.status = 'completed'
+            ), 0
+        ) as transfer_count,
+        ac.created_at,
+        ac.notes
+    FROM asset_checkins ac
+    WHERE ac.id IN (
+        -- 只选择有转账记录的check-ins
+        SELECT DISTINCT asset_checkin_id 
+        FROM transfer_requests 
+        WHERE status = 'completed'
+    )
+    ORDER BY transfer_count DESC
+    LIMIT record_limit;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 测试查询:
+-- SELECT * FROM get_most_traded_records(10);
+
+
+-- 5. 获取Oval Office check-ins的热门统计
+-- ============================================================================
+CREATE OR REPLACE FUNCTION get_trending_oval_assets(record_limit INT DEFAULT 20)
+RETURNS TABLE (
+    asset_name TEXT,
+    record_count BIGINT,
+    last_activity TIMESTAMP WITH TIME ZONE,
+    unique_owners BIGINT
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        oc.asset_name,
+        COUNT(*) as record_count,
+        MAX(oc.created_at) as last_activity,
+        COUNT(DISTINCT oc.username) as unique_owners
+    FROM oval_office_checkins oc
+    WHERE oc.asset_name IS NOT NULL
+    GROUP BY oc.asset_name
+    ORDER BY record_count DESC
+    LIMIT record_limit;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 测试查询:
+-- SELECT * FROM get_trending_oval_assets(10);
+
+
+-- ============================================================================
+-- 权限设置（允许anon用户调用这些函数）
+-- ============================================================================
+GRANT EXECUTE ON FUNCTION get_trending_buildings(INT) TO anon;
+GRANT EXECUTE ON FUNCTION get_top_users(INT) TO anon;
+GRANT EXECUTE ON FUNCTION get_market_stats() TO anon;
+GRANT EXECUTE ON FUNCTION get_most_traded_records(INT) TO anon;
+GRANT EXECUTE ON FUNCTION get_trending_oval_assets(INT) TO anon;
+
+-- ============================================================================
+-- 使用说明
+-- ============================================================================
+-- 1. 在Supabase Dashboard中，进入SQL Editor
+-- 2. 复制粘贴上面的所有SQL代码
+-- 3. 点击"Run"执行
+-- 4. 验证函数是否创建成功:
+--    SELECT * FROM get_market_stats();
+-- 5. 在app中，MarketDataManager会自动使用这些RPC函数
+-- ============================================================================
+

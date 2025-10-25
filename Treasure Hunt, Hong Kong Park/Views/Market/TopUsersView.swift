@@ -17,21 +17,31 @@ struct TopUsersView: View {
             LazyVStack(spacing: 12) {
                 if users.isEmpty {
                     // 空状态
-                    VStack(spacing: 16) {
-                        Image(systemName: "person.3")
-                            .font(.system(size: 48))
-                            .foregroundColor(.gray.opacity(0.5))
+                    VStack(spacing: 20) {
+                        ZStack {
+                            Circle()
+                                .fill(appGreen.opacity(0.1))
+                                .frame(width: 100, height: 100)
+                            
+                            Image(systemName: "person.2")
+                                .font(.system(size: 48))
+                                .foregroundColor(appGreen.opacity(0.6))
+                        }
                         
-                        Text("No active users yet")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                        
-                        Text("Be the first to explore!")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                        VStack(spacing: 8) {
+                            Text("No Active Users")
+                                .font(.title3)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.primary)
+                            
+                            Text("Start your adventure and\nbecome the top explorer!")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                        }
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(.top, 60)
+                    .padding(.top, 80)
                 } else {
                     ForEach(users) { user in
                         TopUserRow(
