@@ -121,10 +121,8 @@ struct CongratulationsView: View {
         }
         .onAppear {
             // 初始化粒子状态
-            particleStates = (0..<12).map { index in
-                let angle = Double(index) * 30.0
-                let distance: CGFloat = 80
-                return ParticleState(
+            particleStates = (0..<12).map { _ in
+                ParticleState(
                     offset: .zero,
                     opacity: 0,
                     scale: 0.5
