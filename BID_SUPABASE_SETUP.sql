@@ -174,7 +174,68 @@ $$ LANGUAGE plpgsql;
 -- 授权
 GRANT EXECUTE ON FUNCTION get_my_received_bids(TEXT) TO anon, authenticated;
 
--- 8. 添加注释
+-- 8. 创建RPC函数：获取我发出的Bid（买家）
+-- ============================================================================
+DROP FUNCTION IF EXISTS get_my_sent_bids(TEXT);
+
+CREATE OR REPLACE FUNCTION get_my_sent_bids(username_param TEXT)
+RETURNS TABLE (
+    id UUID,
+    record_id UUID,
+    record_type TEXT,
+    building_id TEXT,
+    bidder_username TEXT,
+    owner_username TEXT,
+    bid_amount INTEGER,
+    counter_amount INTEGER,
+    bidder_contact TEXT,
+    owner_contact TEXT,
+    status TEXT,
+    created_at TIMESTAMP WITH TIME ZONE,
+    updated_at TIMESTAMP WITH TIME ZONE,
+    expires_at TIMESTAMP WITH TIME ZONE,
+    completed_at TIMESTAMP WITH TIME ZONE,
+    bidder_message TEXT,
+    owner_message TEXT
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        b.id,
+        b.record_id,
+        b.record_type,
+        b.building_id,
+        b.bidder_username,
+        b.owner_username,
+        b.bid_amount,
+        b.counter_amount,
+        b.bidder_contact,
+        b.owner_contact,
+        b.status,
+        b.created_at,
+        b.updated_at,
+        b.expires_at,
+        b.completed_at,
+        b.bidder_message,
+        b.owner_message
+    FROM bids b
+    WHERE b.bidder_username = username_param
+    AND b.status IN ('pending', 'countered', 'accepted')
+    AND b.expires_at > NOW()
+    ORDER BY 
+        CASE b.status
+            WHEN 'countered' THEN 1    -- 有counter的优先（需要买家回应）
+            WHEN 'accepted' THEN 2     -- 已接受其次
+            WHEN 'pending' THEN 3      -- pending最后
+        END,
+        b.updated_at DESC;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 授权
+GRANT EXECUTE ON FUNCTION get_my_sent_bids(TEXT) TO anon, authenticated;
+
+-- 9. 添加注释
 -- ============================================================================
 COMMENT ON TABLE bids IS 'Bid竞价记录表';
 COMMENT ON COLUMN bids.record_id IS 'check-in记录ID';

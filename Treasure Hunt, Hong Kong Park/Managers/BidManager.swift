@@ -83,7 +83,33 @@ class BidManager {
     func getSentBids(bidderUsername: String) async throws -> [Bid] {
         Logger.debug("📤 Fetching sent bids for: \(bidderUsername)")
         
-        let endpoint = "bids?bidder_username=eq.\(bidderUsername)&order=created_at.desc"
+        // 尝试使用RPC函数
+        do {
+            let data = try await NetworkManager.shared.request(
+                url: URL(string: "\(SupabaseConfig.url)/rest/v1/rpc/get_my_sent_bids")!,
+                method: "POST",
+                headers: [
+                    "apikey": SupabaseConfig.anonKey,
+                    "Authorization": "Bearer \(SupabaseConfig.anonKey)",
+                    "Content-Type": "application/json"
+                ],
+                body: try JSONSerialization.data(withJSONObject: ["username_param": bidderUsername]),
+                timeout: 30,
+                retries: 2
+            )
+            
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            let bids = try decoder.decode([Bid].self, from: data)
+            
+            Logger.success("✅ Fetched \(bids.count) sent bids (RPC)")
+            return bids
+        } catch {
+            Logger.warning("⚠️ RPC function not available, using fallback")
+        }
+        
+        // Fallback: 直接查询
+        let endpoint = "bids?bidder_username=eq.\(bidderUsername)&status=in.(pending,countered,accepted)&order=updated_at.desc"
         let data = try await NetworkManager.shared.request(
             url: URL(string: "\(SupabaseConfig.url)/rest/v1/\(endpoint)")!,
             method: "GET",
@@ -99,7 +125,7 @@ class BidManager {
         decoder.dateDecodingStrategy = .iso8601
         let bids = try decoder.decode([Bid].self, from: data)
         
-        Logger.success("✅ Fetched \(bids.count) sent bids")
+        Logger.success("✅ Fetched \(bids.count) sent bids (fallback)")
         return bids
     }
     
