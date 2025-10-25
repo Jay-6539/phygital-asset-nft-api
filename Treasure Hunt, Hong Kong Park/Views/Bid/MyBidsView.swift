@@ -321,7 +321,7 @@ struct MyBidRow: View {
     
     // 是否有更新（卖家有回应）
     var hasUpdate: Bool {
-        bid.status == .countered || bid.status == .accepted
+        bid.status == .countered || bid.status == .accepted || bid.status == .completed
     }
     
     var statusColor: Color {
@@ -654,6 +654,71 @@ struct MyBidDetailView: View {
                     }
                     .padding(20)
                     .background(Color(.systemBackground))
+                } else if bid.status == .accepted {
+                    // 卖家已接受，等待买家确认
+                    VStack(spacing: 12) {
+                        // 提示信息
+                        VStack(spacing: 8) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 40))
+                                .foregroundColor(appGreen)
+                            
+                            Text("Seller Accepted!")
+                                .font(.headline)
+                                .foregroundColor(appGreen)
+                            
+                            Text("The seller has accepted your bid. Confirm to complete the trade.")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 20)
+                        }
+                        .padding(.vertical, 20)
+                        
+                        // 确认按钮
+                        Button(action: {
+                            showAcceptCounter = true
+                        }) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 16))
+                                
+                                Text("Confirm & Share Contact")
+                                    .font(.headline)
+                            }
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(appGreen)
+                            .cornerRadius(12)
+                        }
+                        .disabled(isProcessing)
+                    }
+                    .padding(20)
+                    .background(Color(.systemBackground))
+                } else if bid.status == .completed {
+                    // 交易完成
+                    VStack(spacing: 12) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.gray)
+                            
+                            Text("Trade Completed")
+                                .font(.headline)
+                                .foregroundColor(.gray)
+                        }
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(Color(.systemGray6))
+                        .cornerRadius(12)
+                        
+                        Text("This asset has been transferred to you.\nCheck \"My Assets\" to view it.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(20)
+                    .background(Color(.systemBackground))
                 }
             }
             .frame(maxWidth: 500)
@@ -776,7 +841,7 @@ struct AcceptCounterOfferView: View {
                         .foregroundColor(.blue)
                 }
                 
-                Text("Accept Counter Offer?")
+                Text(bid.status == .accepted ? "Confirm Trade?" : "Accept Counter Offer?")
                     .font(.title2)
                     .fontWeight(.bold)
                 
@@ -787,11 +852,11 @@ struct AcceptCounterOfferView: View {
                     
                     HStack(spacing: 8) {
                         Image(systemName: "star.fill")
-                            .foregroundColor(.blue)
+                            .foregroundColor(bid.status == .accepted ? appGreen : .blue)
                         
-                        Text("\(bid.counterAmount ?? 0)")
+                        Text("\(bid.counterAmount ?? bid.bidAmount)")
                             .font(.system(size: 32, weight: .bold))
-                            .foregroundColor(.blue)
+                            .foregroundColor(bid.status == .accepted ? appGreen : .blue)
                         
                         Text("Credits")
                             .font(.headline)
@@ -799,7 +864,7 @@ struct AcceptCounterOfferView: View {
                     }
                 }
                 .padding(16)
-                .background(Color.blue.opacity(0.1))
+                .background((bid.status == .accepted ? appGreen : Color.blue).opacity(0.1))
                 .cornerRadius(12)
                 
                 // 联系方式输入
