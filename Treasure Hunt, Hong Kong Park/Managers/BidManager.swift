@@ -300,9 +300,6 @@ class BidManager {
         
         let jsonData = try JSONSerialization.data(withJSONObject: updateData)
         
-        // 根据record_type更新对应的表
-        let tableName = bid.recordType == "building" ? "asset_checkins" : "oval_office_checkins"
-        
         // 尝试不同的查询格式
         let recordIdString = bid.recordId.uuidString.uppercased()
         
