@@ -25,6 +25,7 @@ struct MyHistoryFullScreenView: View {
     @State private var selectedBuildingCheckIn: BuildingCheckIn? = nil
     @State private var selectedOvalCheckIn: OvalOfficeCheckIn? = nil
     @State private var showReceiveTransfer = false
+    @State private var showMyBids = false
     
     var body: some View {
         NavigationView {
@@ -124,37 +125,72 @@ struct MyHistoryFullScreenView: View {
                     
                     Spacer()
                     
-                    // Scan QR按钮
-                    Button(action: {
-                        showReceiveTransfer = true
-                    }) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "qrcode.viewfinder")
-                                .font(.system(size: 16))
-                            Text("Scan QR")
-                                .font(.system(size: 14, weight: .semibold))
-                        }
-                        .foregroundColor(appGreen)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background {
-                            ZStack {
-                                Color.clear.background(.ultraThinMaterial)
-                                LinearGradient(
-                                    gradient: Gradient(colors: [
-                                        appGreen.opacity(0.15),
-                                        appGreen.opacity(0.05)
-                                    ]),
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
+                    HStack(spacing: 8) {
+                        // My Bids按钮
+                        Button(action: {
+                            showMyBids = true
+                        }) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "gavel.fill")
+                                    .font(.system(size: 14))
+                                Text("My Bids")
+                                    .font(.system(size: 14, weight: .semibold))
                             }
+                            .foregroundColor(appGreen)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background {
+                                ZStack {
+                                    Color.clear.background(.ultraThinMaterial)
+                                    LinearGradient(
+                                        gradient: Gradient(colors: [
+                                            appGreen.opacity(0.15),
+                                            appGreen.opacity(0.05)
+                                        ]),
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    )
+                                }
+                            }
+                            .cornerRadius(8)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .strokeBorder(appGreen.opacity(0.3), lineWidth: 1)
+                            )
                         }
-                        .cornerRadius(8)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .strokeBorder(appGreen.opacity(0.3), lineWidth: 1)
-                        )
+                        
+                        // Scan QR按钮
+                        Button(action: {
+                            showReceiveTransfer = true
+                        }) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "qrcode.viewfinder")
+                                    .font(.system(size: 16))
+                                Text("Scan QR")
+                                    .font(.system(size: 14, weight: .semibold))
+                            }
+                            .foregroundColor(appGreen)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background {
+                                ZStack {
+                                    Color.clear.background(.ultraThinMaterial)
+                                    LinearGradient(
+                                        gradient: Gradient(colors: [
+                                            appGreen.opacity(0.15),
+                                            appGreen.opacity(0.05)
+                                        ]),
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    )
+                                }
+                            }
+                            .cornerRadius(8)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .strokeBorder(appGreen.opacity(0.3), lineWidth: 1)
+                            )
+                        }
                     }
                 }
                 .padding(20)
@@ -345,6 +381,15 @@ struct MyHistoryFullScreenView: View {
                     loadHistory()
                 },
                 nfcManager: nfcManager
+            )
+        }
+        .fullScreenCover(isPresented: $showMyBids) {
+            MyBidsView(
+                appGreen: appGreen,
+                currentUsername: username,
+                onClose: {
+                    showMyBids = false
+                }
             )
         }
         .onAppear {
