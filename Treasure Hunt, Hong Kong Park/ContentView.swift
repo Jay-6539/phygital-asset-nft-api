@@ -5388,7 +5388,8 @@ struct ContentView: View {
                                 }
                             }
                         }
-                    }
+                    },
+                    currentUsername: username
                 )
             }
     }

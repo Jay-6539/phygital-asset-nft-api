@@ -235,12 +235,32 @@ struct CheckInDetailView: View {
                             }
                             .disabled(isCreatingTransfer)
                         }
+                        
+                        // Bid按钮
+                        Button(action: {
+                            Logger.debug("🎯 Bid button tapped (功能待实现)")
+                            // TODO: 实现Bid功能
+                        }) {
+                            HStack(spacing: 12) {
+                                Image(systemName: "gavel.fill")
+                                    .font(.system(size: 16))
+                                
+                                Text("Bid")
+                                    .font(.headline)
+                            }
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(appGreen)
+                            .cornerRadius(12)
+                            .shadow(color: appGreen.opacity(0.3), radius: 4, x: 0, y: 2)
+                        }
                     }
                     .padding(20)
                 }
             }
             .frame(maxWidth: 400)
-            .frame(maxHeight: 700)
+            .frame(maxHeight: 750)
             .background(Color(.systemBackground))
             .cornerRadius(20)
             .shadow(radius: 20)

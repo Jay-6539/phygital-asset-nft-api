@@ -12,6 +12,7 @@ struct MarketView: View {
     let treasures: [Treasure] // 所有建筑列表，用于匹配名称
     let onClose: () -> Void
     let onNavigateToBuilding: ((String) -> Void)? // 导航到建筑
+    let currentUsername: String? // 当前用户名
     
     @State private var selectedTab: MarketTab = .trending
     @State private var marketStats = MarketStats()
@@ -20,6 +21,7 @@ struct MarketView: View {
     @State private var topUsers: [UserStats] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
+    @State private var selectedBuilding: BuildingWithStats? // 选中的建筑，显示历史记录
     
     var body: some View {
         VStack(spacing: 0) {
@@ -167,7 +169,7 @@ struct MarketView: View {
                             appGreen: appGreen,
                             onBuildingTap: { building in
                                 Logger.debug("Tapped building: \(building.name)")
-                                onNavigateToBuilding?(building.id)
+                                selectedBuilding = building
                             }
                         )
                         
@@ -199,6 +201,18 @@ struct MarketView: View {
         .onAppear {
             Task {
                 await loadMarketData()
+            }
+        }
+        // Building History overlay
+        .overlay {
+            if let building = selectedBuilding {
+                BuildingHistoryView(
+                    building: building,
+                    appGreen: appGreen,
+                    onClose: { selectedBuilding = nil },
+                    currentUsername: currentUsername
+                )
+                .transition(.move(edge: .trailing))
             }
         }
     }
@@ -288,7 +302,8 @@ struct MarketTabButton: View {
         appGreen: .green,
         treasures: [],
         onClose: {},
-        onNavigateToBuilding: nil
+        onNavigateToBuilding: nil,
+        currentUsername: "testuser"
     )
 }
 
