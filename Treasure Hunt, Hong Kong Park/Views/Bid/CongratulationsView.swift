@@ -74,7 +74,7 @@ struct CongratulationsView: View {
                             .strokeBorder(appGreen.opacity(0.3), lineWidth: 2)
                             .frame(width: 100, height: 100)
                             .scaleEffect(ringScale)
-                            .opacity(1 - ringScale * 0.5)
+                            .opacity(1.0 - Double(ringScale) * 0.5)
                         
                         // 主圆形
                         Circle()
