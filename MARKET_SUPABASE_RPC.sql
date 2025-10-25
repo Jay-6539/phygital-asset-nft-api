@@ -43,20 +43,20 @@ BEGIN
     WITH all_users AS (
         -- 获取所有用户（包括没有asset的用户）
         -- 1. 所有曾经check-in的用户
-        SELECT DISTINCT username FROM asset_checkins
+        SELECT DISTINCT ac.username FROM asset_checkins ac
         UNION
         -- 2. 所有transfer_requests中的用户（无论状态）
-        SELECT DISTINCT from_user AS username FROM transfer_requests WHERE from_user IS NOT NULL
+        SELECT DISTINCT tr.from_user AS username FROM transfer_requests tr WHERE tr.from_user IS NOT NULL
         UNION
-        SELECT DISTINCT to_user AS username FROM transfer_requests WHERE to_user IS NOT NULL
+        SELECT DISTINCT tr.to_user AS username FROM transfer_requests tr WHERE tr.to_user IS NOT NULL
         UNION
         -- 3. 所有bids中的用户（无论状态）
-        SELECT DISTINCT bidder_username AS username FROM bids WHERE bidder_username IS NOT NULL
+        SELECT DISTINCT b.bidder_username AS username FROM bids b WHERE b.bidder_username IS NOT NULL
         UNION
-        SELECT DISTINCT owner_username AS username FROM bids WHERE owner_username IS NOT NULL
+        SELECT DISTINCT b.owner_username AS username FROM bids b WHERE b.owner_username IS NOT NULL
         UNION
         -- 4. Oval Office用户
-        SELECT DISTINCT username FROM oval_office_checkins WHERE username IS NOT NULL
+        SELECT DISTINCT oc.username FROM oval_office_checkins oc WHERE oc.username IS NOT NULL
     )
     SELECT 
         au.username,
