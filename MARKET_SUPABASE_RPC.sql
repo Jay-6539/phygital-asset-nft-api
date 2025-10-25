@@ -47,7 +47,7 @@ BEGIN
         COALESCE(
             (SELECT COUNT(*) 
              FROM transfer_requests tr 
-             WHERE tr.sender_username = ac.username 
+             WHERE tr.from_user = ac.username 
              AND tr.status = 'completed'
             ), 0
         ) as transfer_count,
@@ -109,7 +109,8 @@ BEGIN
         COALESCE(
             (SELECT COUNT(*) 
              FROM transfer_requests tr 
-             WHERE tr.asset_checkin_id = ac.id 
+             WHERE tr.record_id = ac.id 
+             AND tr.record_type = 'building'
              AND tr.status = 'completed'
             ), 0
         ) as transfer_count,
@@ -118,9 +119,10 @@ BEGIN
     FROM asset_checkins ac
     WHERE ac.id IN (
         -- 只选择有转账记录的check-ins
-        SELECT DISTINCT asset_checkin_id 
+        SELECT DISTINCT record_id 
         FROM transfer_requests 
-        WHERE status = 'completed'
+        WHERE record_type = 'building'
+        AND status = 'completed'
     )
     ORDER BY transfer_count DESC
     LIMIT record_limit;
