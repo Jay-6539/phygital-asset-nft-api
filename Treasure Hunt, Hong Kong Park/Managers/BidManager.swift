@@ -221,10 +221,29 @@ class BidManager {
         
         Logger.success("✅ Bid updated to \(newStatus), contact info exchanged")
         
-        // 2. 如果双方都接受了（completed），转移资产所有权
+        // 2. 如果是卖家Accept，自动拒绝同一资产的其他pending Bid
+        if !isBidder && newStatus == "accepted" {
+            Logger.debug("🚫 Seller accepted, rejecting other pending bids for this asset...")
+            try await rejectOtherBidsForAsset(
+                acceptedBidId: bidId,
+                recordId: bidData.recordId,
+                recordType: bidData.recordType
+            )
+        }
+        
+        // 3. 如果双方都接受了（completed），转移资产所有权
         if shouldComplete {
             Logger.debug("🔄 Both parties accepted, transferring asset...")
             try await transferAssetOwnership(bid: bidData)
+            
+            // 转移完成后，也拒绝其他所有pending的Bid
+            Logger.debug("🚫 Asset transferred, rejecting all other bids for this asset...")
+            try await rejectOtherBidsForAsset(
+                acceptedBidId: bidId,
+                recordId: bidData.recordId,
+                recordType: bidData.recordType
+            )
+            
             Logger.success("✅ Asset transfer completed!")
         } else {
             Logger.debug("⏳ Waiting for other party to accept")
@@ -369,6 +388,73 @@ class BidManager {
                 Logger.success("✅ Asset ownership transferred to '\(bid.bidderUsername)'")
                 Logger.success("✅ Record \(bid.recordId) now belongs to '\(bid.bidderUsername)'")
             }
+        }
+    }
+    
+    // MARK: - 拒绝同一资产的其他Bid
+    private func rejectOtherBidsForAsset(
+        acceptedBidId: UUID,
+        recordId: UUID,
+        recordType: String
+    ) async throws {
+        Logger.debug("🔍 Finding other bids for record: \(recordId)")
+        
+        // 查询同一资产的所有pending和countered状态的Bid（排除当前接受的Bid）
+        let endpoint = "bids?record_id=eq.\(recordId.uuidString)&record_type=eq.\(recordType)&status=in.(pending,countered)&id=neq.\(acceptedBidId.uuidString)"
+        
+        let data = try await NetworkManager.shared.request(
+            url: URL(string: "\(SupabaseConfig.url)/rest/v1/\(endpoint)")!,
+            method: "GET",
+            headers: [
+                "apikey": SupabaseConfig.anonKey,
+                "Authorization": "Bearer \(SupabaseConfig.anonKey)"
+            ],
+            timeout: 30,
+            retries: 2
+        )
+        
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let otherBids = try decoder.decode([Bid].self, from: data)
+        
+        Logger.debug("📋 Found \(otherBids.count) other bids to reject")
+        
+        guard !otherBids.isEmpty else {
+            Logger.debug("✅ No other bids to reject")
+            return
+        }
+        
+        // 批量拒绝这些Bid
+        let rejectData: [String: Any] = [
+            "status": "rejected",
+            "owner_message": "This asset has been sold to another buyer.",
+            "updated_at": ISO8601DateFormatter().string(from: Date())
+        ]
+        
+        let jsonData = try JSONSerialization.data(withJSONObject: rejectData)
+        
+        // 使用in操作符批量更新
+        let bidIds = otherBids.map { $0.id.uuidString }.joined(separator: ",")
+        let updateEndpoint = "bids?id=in.(\(bidIds))"
+        
+        _ = try await NetworkManager.shared.request(
+            url: URL(string: "\(SupabaseConfig.url)/rest/v1/\(updateEndpoint)")!,
+            method: "PATCH",
+            headers: [
+                "apikey": SupabaseConfig.anonKey,
+                "Authorization": "Bearer \(SupabaseConfig.anonKey)",
+                "Content-Type": "application/json"
+            ],
+            body: jsonData,
+            timeout: 30,
+            retries: 3
+        )
+        
+        Logger.success("✅ Rejected \(otherBids.count) other bids for this asset")
+        
+        // 记录被拒绝的Bid
+        for bid in otherBids {
+            Logger.debug("   ❌ Rejected bid from @\(bid.bidderUsername) (\(bid.bidAmount) credits)")
         }
     }
     
