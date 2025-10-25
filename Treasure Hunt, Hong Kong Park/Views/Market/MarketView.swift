@@ -23,6 +23,7 @@ struct MarketView: View {
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var selectedBuilding: BuildingWithStats? // 选中的建筑，显示历史记录
+    @State private var selectedTradedRecord: CheckInWithTransferStats? // 选中的交易记录
     @State private var showBidList = false
     @State private var unreadBidCount = 0
     @State private var userCredits = 0
@@ -223,7 +224,7 @@ struct MarketView: View {
                             appGreen: appGreen,
                             onRecordTap: { record in
                                 Logger.debug("Tapped record: \(record.id)")
-                                // TODO: 显示记录详情
+                                selectedTradedRecord = record
                             }
                         )
                         
@@ -259,6 +260,18 @@ struct MarketView: View {
                     currentUsername: currentUsername
                 )
                 .transition(.move(edge: .trailing))
+            }
+        }
+        // Traded Record Detail overlay
+        .overlay {
+            if let record = selectedTradedRecord {
+                TradedRecordDetailView(
+                    record: record,
+                    appGreen: appGreen,
+                    currentUsername: currentUsername,
+                    onClose: { selectedTradedRecord = nil }
+                )
+                .transition(.opacity)
             }
         }
         // Bid Management overlay

@@ -95,6 +95,7 @@ RETURNS TABLE (
     id UUID,
     building_id TEXT,
     building_name TEXT,
+    asset_name TEXT,
     image_url TEXT,
     username TEXT,
     transfer_count BIGINT,
@@ -107,6 +108,7 @@ BEGIN
         ac.id,
         ac.building_id,
         ''::TEXT as building_name,  -- 将在app中匹配
+        ac.asset_name,
         ac.image_url,
         ac.username,
         COALESCE(

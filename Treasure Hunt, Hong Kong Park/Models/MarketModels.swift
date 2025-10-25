@@ -50,6 +50,7 @@ struct CheckInWithTransferStats: Identifiable, Codable {
     let id: String
     let buildingId: String
     let buildingName: String
+    let assetName: String?
     let imageUrl: String?
     let ownerUsername: String
     let transferCount: Int
@@ -60,6 +61,7 @@ struct CheckInWithTransferStats: Identifiable, Codable {
         case id
         case buildingId = "building_id"
         case buildingName = "building_name"
+        case assetName = "asset_name"
         case imageUrl = "image_url"
         case ownerUsername = "username"
         case transferCount = "transfer_count"

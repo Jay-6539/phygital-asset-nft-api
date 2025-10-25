@@ -111,6 +111,7 @@ class MarketDataManager {
                 let id: String
                 let building_id: String
                 let building_name: String?
+                let asset_name: String?
                 let image_url: String?
                 let username: String
                 let transfer_count: Int
@@ -126,6 +127,7 @@ class MarketDataManager {
                     id: result.id,
                     buildingId: result.building_id,
                     buildingName: result.building_name ?? "Building \(result.building_id)",
+                    assetName: result.asset_name,
                     imageUrl: result.image_url,
                     ownerUsername: result.username,
                     transferCount: result.transfer_count,

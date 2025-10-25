@@ -65,13 +65,22 @@ struct MostTradedCard: View {
     
     var body: some View {
         HStack(spacing: 12) {
-            // 左侧：资产名称和转账次数
+            // 左侧：资产信息和转账次数
             VStack(alignment: .leading, spacing: 6) {
+                // Asset Name（如果有）
+                if let assetName = record.assetName, !assetName.isEmpty {
+                    Text(assetName)
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+                }
+                
+                // Building Name
                 Text(record.buildingName)
-                    .font(.headline)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.primary)
-                    .lineLimit(2)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
                 
                 // 转账次数徽章
                 HStack(spacing: 6) {
