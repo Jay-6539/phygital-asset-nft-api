@@ -79,7 +79,7 @@ class MarketDataManager {
             let results = try JSONDecoder().decode([TrendingResult].self, from: data)
             let dateFormatter = ISO8601DateFormatter()
             
-            var buildings = results.enumerated().map { (index, result) -> BuildingWithStats in
+            let buildings = results.enumerated().map { (index, result) -> BuildingWithStats in
                 BuildingWithStats(
                     id: result.building_id,
                     name: "Building \(result.building_id)",

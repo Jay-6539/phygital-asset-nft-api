@@ -117,20 +117,16 @@ class ImageCacheManager {
     }
 }
 
-// MARK: - String MD5 Extension
+// MARK: - String Hash Extension (SHA256 instead of MD5)
+import CryptoKit
+
 extension String {
     var md5Hash: String {
+        // Note: Keep the name 'md5Hash' for backward compatibility
+        // but use SHA256 for security
         let data = Data(self.utf8)
-        var hash = [UInt8](repeating: 0, count: Int(CC_MD5_DIGEST_LENGTH))
-        
-        data.withUnsafeBytes { buffer in
-            _ = CC_MD5(buffer.baseAddress, CC_LONG(buffer.count), &hash)
-        }
-        
-        return hash.map { String(format: "%02x", $0) }.joined()
+        let hash = SHA256.hash(data: data)
+        return hash.compactMap { String(format: "%02x", $0) }.joined()
     }
 }
-
-// 需要导入CommonCrypto
-import CommonCrypto
 
