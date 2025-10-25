@@ -14,6 +14,7 @@ class BidManager {
     // MARK: - 创建Bid
     func createBid(request: CreateBidRequest, bidderUsername: String) async throws -> Bid {
         Logger.debug("💰 Creating bid: \(request.bidAmount) credits for record \(request.recordId)")
+        Logger.debug("📝 Bidder: '\(bidderUsername)' -> Owner: '\(request.ownerUsername)'")
         
         let bidData: [String: Any] = [
             "record_id": request.recordId.uuidString,
@@ -25,6 +26,8 @@ class BidManager {
             "bidder_message": request.message as Any,
             "status": "pending"
         ]
+        
+        Logger.debug("📤 Bid data: bidder='\(bidderUsername)', owner='\(request.ownerUsername)', amount=\(request.bidAmount)")
         
         let jsonData = try JSONSerialization.data(withJSONObject: bidData)
         
@@ -47,10 +50,15 @@ class BidManager {
         let bids = try decoder.decode([Bid].self, from: data)
         
         guard let bid = bids.first else {
+            Logger.error("❌ No bid returned from database")
             throw NSError(domain: "BidManager", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to create bid"])
         }
         
-        Logger.success("✅ Bid created: \(bid.id)")
+        Logger.success("✅ Bid created successfully!")
+        Logger.debug("📋 Bid ID: \(bid.id)")
+        Logger.debug("📋 Bidder: '\(bid.bidderUsername)' | Owner: '\(bid.ownerUsername)'")
+        Logger.debug("📋 Amount: \(bid.bidAmount) | Status: \(bid.status.rawValue)")
+        
         return bid
     }
     
@@ -81,7 +89,7 @@ class BidManager {
     
     // MARK: - 获取我发出的Bid（作为买家）
     func getSentBids(bidderUsername: String) async throws -> [Bid] {
-        Logger.debug("📤 Fetching sent bids for: \(bidderUsername)")
+        Logger.debug("📤 Fetching sent bids for bidder: '\(bidderUsername)'")
         
         // 尝试使用RPC函数
         do {
@@ -102,14 +110,17 @@ class BidManager {
             decoder.dateDecodingStrategy = .iso8601
             let bids = try decoder.decode([Bid].self, from: data)
             
-            Logger.success("✅ Fetched \(bids.count) sent bids (RPC)")
+            Logger.success("✅ Fetched \(bids.count) sent bids via RPC for '\(bidderUsername)'")
             return bids
         } catch {
-            Logger.warning("⚠️ RPC function not available, using fallback")
+            Logger.warning("⚠️ RPC function failed: \(error.localizedDescription), using fallback")
         }
         
-        // Fallback: 直接查询
-        let endpoint = "bids?bidder_username=eq.\(bidderUsername)&status=in.(pending,countered,accepted)&order=updated_at.desc"
+        // Fallback: 直接查询所有状态
+        Logger.debug("📤 Using fallback query for bidder: '\(bidderUsername)'")
+        let endpoint = "bids?bidder_username=eq.\(bidderUsername)&order=updated_at.desc"
+        Logger.debug("🔍 Query endpoint: \(endpoint)")
+        
         let data = try await NetworkManager.shared.request(
             url: URL(string: "\(SupabaseConfig.url)/rest/v1/\(endpoint)")!,
             method: "GET",
@@ -125,7 +136,17 @@ class BidManager {
         decoder.dateDecodingStrategy = .iso8601
         let bids = try decoder.decode([Bid].self, from: data)
         
-        Logger.success("✅ Fetched \(bids.count) sent bids (fallback)")
+        Logger.success("✅ Fetched \(bids.count) sent bids via fallback for '\(bidderUsername)'")
+        
+        // 打印详细信息
+        if bids.isEmpty {
+            Logger.warning("⚠️ No bids found. Check if bidder_username in database matches: '\(bidderUsername)'")
+        } else {
+            for bid in bids {
+                Logger.debug("📋 Bid: \(bid.id) | Status: \(bid.status.rawValue) | Owner: \(bid.ownerUsername)")
+            }
+        }
+        
         return bids
     }
     
