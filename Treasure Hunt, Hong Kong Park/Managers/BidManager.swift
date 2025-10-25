@@ -183,10 +183,18 @@ class BidManager {
     func acceptBid(bidId: UUID, contactInfo: String, isBidder: Bool) async throws {
         Logger.debug("✅ Accepting bid: \(bidId)")
         
+        // 先查询bid详情以获取record信息
+        let bidData = try await getBidDetail(bidId: bidId)
+        
+        // 1. 更新bid状态（如果双方都提供了联系方式，标记为completed并转移资产）
+        let shouldComplete = isBidder ? (bidData.ownerContact != nil) : (bidData.bidderContact != nil)
+        let newStatus = shouldComplete ? "completed" : "accepted"
+        
         let updateData: [String: Any] = [
             isBidder ? "bidder_contact" : "owner_contact": contactInfo,
-            "status": "accepted",
-            "updated_at": ISO8601DateFormatter().string(from: Date())
+            "status": newStatus,
+            "updated_at": ISO8601DateFormatter().string(from: Date()),
+            "completed_at": shouldComplete ? ISO8601DateFormatter().string(from: Date()) : NSNull()
         ]
         
         let jsonData = try JSONSerialization.data(withJSONObject: updateData)
@@ -204,7 +212,67 @@ class BidManager {
             retries: 3
         )
         
-        Logger.success("✅ Bid accepted, contact info exchanged")
+        Logger.success("✅ Bid \(newStatus), contact info exchanged")
+        
+        // 2. 如果双方都接受了（completed），转移资产所有权
+        if shouldComplete {
+            try await transferAssetOwnership(bid: bidData)
+        }
+    }
+    
+    // MARK: - 获取Bid详情
+    private func getBidDetail(bidId: UUID) async throws -> Bid {
+        let endpoint = "bids?id=eq.\(bidId.uuidString)"
+        let data = try await NetworkManager.shared.request(
+            url: URL(string: "\(SupabaseConfig.url)/rest/v1/\(endpoint)")!,
+            method: "GET",
+            headers: [
+                "apikey": SupabaseConfig.anonKey,
+                "Authorization": "Bearer \(SupabaseConfig.anonKey)"
+            ],
+            timeout: 30,
+            retries: 2
+        )
+        
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let bids = try decoder.decode([Bid].self, from: data)
+        
+        guard let bid = bids.first else {
+            throw NSError(domain: "BidManager", code: -1, userInfo: [NSLocalizedDescriptionKey: "Bid not found"])
+        }
+        
+        return bid
+    }
+    
+    // MARK: - 转移资产所有权
+    private func transferAssetOwnership(bid: Bid) async throws {
+        Logger.debug("🔄 Transferring asset ownership from '\(bid.ownerUsername)' to '\(bid.bidderUsername)'")
+        
+        let updateData: [String: Any] = [
+            "username": bid.bidderUsername,
+            "updated_at": ISO8601DateFormatter().string(from: Date())
+        ]
+        
+        let jsonData = try JSONSerialization.data(withJSONObject: updateData)
+        
+        // 根据record_type更新对应的表
+        let tableName = bid.recordType == "building" ? "asset_checkins" : "oval_office_checkins"
+        
+        _ = try await NetworkManager.shared.request(
+            url: URL(string: "\(SupabaseConfig.url)/rest/v1/\(tableName)?id=eq.\(bid.recordId.uuidString)")!,
+            method: "PATCH",
+            headers: [
+                "apikey": SupabaseConfig.anonKey,
+                "Authorization": "Bearer \(SupabaseConfig.anonKey)",
+                "Content-Type": "application/json"
+            ],
+            body: jsonData,
+            timeout: 30,
+            retries: 3
+        )
+        
+        Logger.success("✅ Asset ownership transferred to '\(bid.bidderUsername)'")
     }
     
     // MARK: - 拒绝Bid

@@ -159,13 +159,14 @@ BEGIN
         b.owner_message
     FROM bids b
     WHERE b.owner_username = username_param
-    AND b.status IN ('pending', 'countered', 'accepted')  -- 增加accepted状态
-    AND b.expires_at > NOW()
+    AND b.status IN ('pending', 'countered', 'accepted', 'completed')
+    AND (b.expires_at > NOW() OR b.status = 'completed')  -- completed不受过期时间限制
     ORDER BY 
         CASE b.status
             WHEN 'pending' THEN 1      -- pending优先显示
             WHEN 'countered' THEN 2    -- countered其次
-            WHEN 'accepted' THEN 3     -- accepted最后
+            WHEN 'accepted' THEN 3     -- accepted第三
+            WHEN 'completed' THEN 4    -- completed最后（灰色）
         END,
         b.updated_at DESC;             -- 同状态按更新时间排序
 END;
@@ -220,13 +221,14 @@ BEGIN
         b.owner_message
     FROM bids b
     WHERE b.bidder_username = username_param
-    AND b.status IN ('pending', 'countered', 'accepted')
-    AND b.expires_at > NOW()
+    AND b.status IN ('pending', 'countered', 'accepted', 'completed')
+    AND (b.expires_at > NOW() OR b.status = 'completed')
     ORDER BY 
         CASE b.status
             WHEN 'countered' THEN 1    -- 有counter的优先（需要买家回应）
             WHEN 'accepted' THEN 2     -- 已接受其次
-            WHEN 'pending' THEN 3      -- pending最后
+            WHEN 'pending' THEN 3      -- pending第三
+            WHEN 'completed' THEN 4    -- completed最后（灰色）
         END,
         b.updated_at DESC;
 END;

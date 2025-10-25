@@ -251,6 +251,14 @@ struct BidRow: View {
                             .padding(.vertical, 2)
                             .background(appGreen)  // 原色
                             .cornerRadius(4)
+                    } else if bid.status == .completed {
+                        Text("Completed")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.gray)
+                            .cornerRadius(4)
                     } else if bid.status == .pending && isUnread {
                         Text("New")
                             .font(.system(size: 9, weight: .bold))
@@ -344,6 +352,8 @@ struct BidRow: View {
             return .blue
         case .accepted:
             return appGreen
+        case .completed:
+            return .gray
         default:
             return .gray
         }

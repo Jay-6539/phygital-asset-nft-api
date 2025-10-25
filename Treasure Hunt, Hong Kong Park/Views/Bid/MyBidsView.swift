@@ -250,6 +250,14 @@ struct MyBidRow: View {
                             .padding(.vertical, 2)
                             .background(appGreen)
                             .cornerRadius(4)
+                    } else if bid.status == .completed {
+                        Text("Completed")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.gray)
+                            .cornerRadius(4)
                     } else if bid.status == .rejected {
                         Text("Rejected")
                             .font(.system(size: 9, weight: .bold))
@@ -324,6 +332,8 @@ struct MyBidRow: View {
             return .blue
         case .accepted:
             return appGreen
+        case .completed:
+            return .gray
         case .rejected:
             return .red
         default:
@@ -694,6 +704,8 @@ struct MyBidDetailView: View {
             return .blue
         case .accepted:
             return appGreen
+        case .completed:
+            return .gray
         case .rejected:
             return .red
         default:
