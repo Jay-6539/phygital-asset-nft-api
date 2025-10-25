@@ -129,40 +129,33 @@ struct TradedRecordDetailView: View {
                                 Logger.debug("🎯 Bid button tapped")
                                 showBidInput = true
                             }) {
-                                HStack(spacing: 12) {
-                                    Image(systemName: "dollarsign.circle.fill")
-                                        .font(.system(size: 16))
-                                    
-                                    Text("Bid")
-                                        .font(.headline)
-                                }
-                                .foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 16)
-                                .background(
-                                    LinearGradient(
-                                        gradient: Gradient(stops: [
-                                            .init(color: appGreen.opacity(0.8), location: 0),
-                                            .init(color: appGreen, location: 0.5),
-                                            .init(color: appGreen.opacity(0.9), location: 1)
-                                        ]),
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                .cornerRadius(12)
-                                .shadow(color: appGreen.opacity(0.3), radius: 8, x: 0, y: 4)
+                                Text("Bid")
+                                    .font(.headline)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 16)
+                                    .background {
+                                        ZStack {
+                                            Color.clear.background(.ultraThinMaterial)
+                                            appGreen.opacity(0.8)
+                                        }
+                                    }
+                                    .cornerRadius(12)
+                                    .shadow(color: appGreen.opacity(0.3), radius: 8, x: 0, y: 4)
                             }
                         }
                     }
                     .padding(20)
                 }
             }
-            .frame(maxWidth: 500, maxHeight: 600)
+            .frame(maxWidth: 550)
+            .frame(maxHeight: .infinity)
             .background(Color(.systemBackground))
             .cornerRadius(20)
             .shadow(radius: 20)
-            .padding(40)
+            .padding(.horizontal, 30)
+            .padding(.vertical, 50)
             
             // Bid Input界面
             if showBidInput {
