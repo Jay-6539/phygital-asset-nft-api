@@ -22,6 +22,8 @@
 3. 粘贴到Supabase SQL Editor
 4. 点击 **"Run"** 按钮
 
+**注意**: SQL文件已包含 `DROP FUNCTION IF EXISTS` 语句，会自动删除旧函数并重新创建，无需手动删除。
+
 ### 4️⃣ 验证函数已更新
 执行以下测试查询：
 
