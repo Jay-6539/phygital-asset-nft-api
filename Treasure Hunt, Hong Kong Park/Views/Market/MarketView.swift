@@ -13,6 +13,7 @@ struct MarketView: View {
     let onClose: () -> Void
     let onNavigateToBuilding: ((String) -> Void)? // 导航到建筑
     let currentUsername: String? // 当前用户名
+    let onBidCountUpdate: ((Int) -> Void)? // Bid计数更新回调
     
     @State private var selectedTab: MarketTab = .trending
     @State private var marketStats = MarketStats()
@@ -256,6 +257,7 @@ struct MarketView: View {
         guard let username = currentUsername else {
             await MainActor.run {
                 self.unreadBidCount = 0
+                onBidCountUpdate?(0)
             }
             return
         }
@@ -264,12 +266,14 @@ struct MarketView: View {
             let count = try await BidManager.shared.getUnreadBidCount(ownerUsername: username)
             await MainActor.run {
                 self.unreadBidCount = count
+                onBidCountUpdate?(count)
             }
             Logger.debug("🔔 Unread bid count: \(count)")
         } catch {
             Logger.error("❌ Failed to load unread bid count: \(error.localizedDescription)")
             await MainActor.run {
                 self.unreadBidCount = 0
+                onBidCountUpdate?(0)
             }
         }
     }
@@ -360,7 +364,8 @@ struct MarketTabButton: View {
         treasures: [],
         onClose: {},
         onNavigateToBuilding: nil,
-        currentUsername: "testuser"
+        currentUsername: "testuser",
+        onBidCountUpdate: nil
     )
 }
 

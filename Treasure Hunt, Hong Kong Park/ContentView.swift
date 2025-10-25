@@ -1242,6 +1242,7 @@ struct ContentView: View {
     @State private var showOvalOfficeHistory: Bool = false  // 是否显示Oval Office历史记录modal
     @State private var showBottomMenu: Bool = false  // 是否显示底部按钮的扇形菜单
     @State private var showMarket: Bool = false  // 是否显示Market页面
+    @State private var unreadBidCount: Int = 0  // 未读Bid数量
     
     @State private var routePolyline: MKPolyline? = nil
     @State private var routeDistanceMeters: CLLocationDistance? = nil
@@ -2337,16 +2338,39 @@ struct ContentView: View {
                                 showMarket = true
                             }
                         }) {
-                            VStack(spacing: 4) {
-                                Circle()
-                                    .fill(Color.white)
-                                    .frame(width: 50, height: 50)
-                                    .shadow(radius: 4)
-                                    .overlay(
-                                        Text("Market")
-                                            .font(.system(size: 10, weight: .bold))
-                                            .foregroundColor(appGreen)
-                                    )
+                            ZStack(alignment: .topTrailing) {
+                                VStack(spacing: 4) {
+                                    Circle()
+                                        .fill(Color.white)
+                                        .frame(width: 50, height: 50)
+                                        .shadow(radius: 4)
+                                        .overlay(
+                                            Text("Market")
+                                                .font(.system(size: 10, weight: .bold))
+                                                .foregroundColor(appGreen)
+                                        )
+                                }
+                                
+                                // 未读Bid徽章
+                                if unreadBidCount > 0 {
+                                    ZStack {
+                                        Circle()
+                                            .fill(appGreen)
+                                            .frame(width: 18, height: 18)
+                                        
+                                        if unreadBidCount < 100 {
+                                            Text("\(unreadBidCount)")
+                                                .font(.system(size: 10, weight: .bold))
+                                                .foregroundColor(.white)
+                                        } else {
+                                            Text("99+")
+                                                .font(.system(size: 8, weight: .bold))
+                                                .foregroundColor(.white)
+                                        }
+                                    }
+                                    .offset(x: 8, y: -2)
+                                    .shadow(color: appGreen.opacity(0.3), radius: 2, x: 0, y: 1)
+                                }
                             }
                         }
                         .offset(x: 34, y: -94)
@@ -5389,7 +5413,10 @@ struct ContentView: View {
                             }
                         }
                     },
-                    currentUsername: username
+                    currentUsername: username,
+                    onBidCountUpdate: { count in
+                        unreadBidCount = count
+                    }
                 )
             }
     }
