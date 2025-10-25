@@ -30,7 +30,7 @@ struct MyBidsView: View {
                             Circle().fill(Color(.systemGray6))
                             Image(systemName: "xmark")
                                 .font(.system(size: 14, weight: .semibold))
-                                .foregroundColor(.gray)
+                                .foregroundColor(appGreen)
                         }
                         .frame(width: 32, height: 32)
                     }
@@ -370,6 +370,7 @@ struct MyBidDetailView: View {
     @State private var isProcessing = false
     @State private var showError = false
     @State private var errorMessage = ""
+    @State private var showCongratulations = false
     
     var body: some View {
         ZStack {
@@ -649,7 +650,7 @@ struct MyBidDetailView: View {
                             onClose()
                         }
                         .font(.subheadline)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(appGreen)
                         .padding(.vertical, 8)
                     }
                     .padding(20)
@@ -738,6 +739,18 @@ struct MyBidDetailView: View {
                     }
                 )
             }
+            
+            // Congratulations动画
+            if showCongratulations {
+                CongratulationsView(
+                    appGreen: appGreen,
+                    onDismiss: {
+                        showCongratulations = false
+                        onActionCompleted() // 刷新列表
+                        onClose() // 关闭详情页
+                    }
+                )
+            }
         }
         .alert("Error", isPresented: $showError) {
             Button("OK") { showError = false }
@@ -796,7 +809,9 @@ struct MyBidDetailView: View {
                 
                 await MainActor.run {
                     isProcessing = false
-                    onActionCompleted()
+                    // 显示Congratulations动画
+                    showCongratulations = true
+                    // onActionCompleted会在动画关闭时调用
                 }
             } catch {
                 Logger.error("Failed to accept counter: \(error)")

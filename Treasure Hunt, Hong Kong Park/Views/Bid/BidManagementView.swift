@@ -92,7 +92,7 @@ struct BidManagementView: View {
                                     } else if tab == .offers && unreadOffersCount > 0 {
                                         ZStack {
                                             Circle()
-                                                .fill(Color.blue)
+                                                .fill(appGreen.opacity(0.5))
                                                 .frame(width: 18, height: 18)
                                             
                                             Text("\(unreadOffersCount)")
