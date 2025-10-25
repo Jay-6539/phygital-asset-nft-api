@@ -321,6 +321,7 @@ struct CheckInDetailView: View {
                     buildingId: checkIn.buildingId,
                     ownerUsername: checkIn.username,
                     recordDescription: checkIn.description,
+                    currentUsername: currentUsername ?? "Unknown",
                     appGreen: appGreen,
                     onClose: {
                         showBidInput = false

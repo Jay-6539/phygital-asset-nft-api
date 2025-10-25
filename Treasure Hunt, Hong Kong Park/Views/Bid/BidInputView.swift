@@ -13,6 +13,7 @@ struct BidInputView: View {
     let buildingId: String?
     let ownerUsername: String
     let recordDescription: String
+    let currentUsername: String
     let appGreen: Color
     let onClose: () -> Void
     let onSuccess: () -> Void
@@ -212,9 +213,6 @@ struct BidInputView: View {
                     message: message.isEmpty ? nil : message
                 )
                 
-                // 获取当前用户名（从UserDefaults或其他地方）
-                let currentUsername = UserDefaults.standard.string(forKey: "username") ?? "Unknown"
-                
                 _ = try await BidManager.shared.createBid(
                     request: request,
                     bidderUsername: currentUsername
@@ -246,6 +244,7 @@ struct BidInputView: View {
         buildingId: "1",
         ownerUsername: "seller123",
         recordDescription: "Beautiful historic building check-in with amazing photos",
+        currentUsername: "buyer123",
         appGreen: .green,
         onClose: {},
         onSuccess: {}

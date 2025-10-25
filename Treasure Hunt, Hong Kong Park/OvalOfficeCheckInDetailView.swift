@@ -318,6 +318,7 @@ struct OvalOfficeCheckInDetailView: View {
                     buildingId: nil,
                     ownerUsername: checkIn.username,
                     recordDescription: checkIn.assetName ?? checkIn.description,
+                    currentUsername: currentUsername ?? "Unknown",
                     appGreen: appGreen,
                     onClose: {
                         showBidInput = false
