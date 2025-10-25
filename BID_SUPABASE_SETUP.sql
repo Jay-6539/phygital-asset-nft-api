@@ -147,9 +147,15 @@ BEGIN
         b.owner_message
     FROM bids b
     WHERE b.owner_username = username_param
-    AND b.status IN ('pending', 'countered')
+    AND b.status IN ('pending', 'countered', 'accepted')  -- 增加accepted状态
     AND b.expires_at > NOW()
-    ORDER BY b.created_at DESC;
+    ORDER BY 
+        CASE b.status
+            WHEN 'pending' THEN 1      -- pending优先显示
+            WHEN 'countered' THEN 2    -- countered其次
+            WHEN 'accepted' THEN 3     -- accepted最后
+        END,
+        b.updated_at DESC;             -- 同状态按更新时间排序
 END;
 $$ LANGUAGE plpgsql;
 

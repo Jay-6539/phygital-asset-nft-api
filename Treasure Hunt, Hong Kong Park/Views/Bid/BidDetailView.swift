@@ -222,36 +222,34 @@ struct BidDetailView: View {
                         .disabled(isProcessing)
                         
                         HStack(spacing: 12) {
-                            // 反价按钮
-                            if bid.status == .pending {
-                                Button(action: {
-                                    showCounter = true
-                                }) {
-                                    HStack(spacing: 8) {
-                                        Image(systemName: "arrow.left.arrow.right")
-                                            .font(.system(size: 14))
-                                        
-                                        Text("Counter")
-                                            .font(.subheadline)
-                                            .fontWeight(.semibold)
-                                    }
-                                    .foregroundColor(appGreen)
-                                    .frame(maxWidth: .infinity)
-                                    .padding()
-                                    .background {
-                                        ZStack {
-                                            Color.clear.background(.ultraThinMaterial)
-                                            appGreen.opacity(0.1)
-                                        }
-                                    }
-                                    .cornerRadius(12)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 12)
-                                            .strokeBorder(appGreen.opacity(0.3), lineWidth: 1)
-                                    )
+                            // 反价按钮（pending和countered都可以继续反价）
+                            Button(action: {
+                                showCounter = true
+                            }) {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "arrow.left.arrow.right")
+                                        .font(.system(size: 14))
+                                    
+                                    Text(bid.status == .countered ? "Change Price" : "Counter")
+                                        .font(.subheadline)
+                                        .fontWeight(.semibold)
                                 }
-                                .disabled(isProcessing)
+                                .foregroundColor(bid.status == .countered ? Color.blue : appGreen)
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background {
+                                    ZStack {
+                                        Color.clear.background(.ultraThinMaterial)
+                                        (bid.status == .countered ? Color.blue : appGreen).opacity(0.1)
+                                    }
+                                }
+                                .cornerRadius(12)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .strokeBorder((bid.status == .countered ? Color.blue : appGreen).opacity(0.3), lineWidth: 1)
+                                )
                             }
+                            .disabled(isProcessing)
                             
                             // 拒绝按钮
                             Button(action: {
@@ -272,6 +270,57 @@ struct BidDetailView: View {
                                 .cornerRadius(12)
                             }
                             .disabled(isProcessing)
+                        }
+                    }
+                    .padding(20)
+                    .background(Color(.systemBackground))
+                } else if bid.status == .accepted {
+                    // Accepted状态显示联系信息
+                    VStack(spacing: 12) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(appGreen)
+                            
+                            Text("Bid Accepted!")
+                                .font(.headline)
+                                .foregroundColor(appGreen)
+                        }
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(appGreen.opacity(0.1))
+                        .cornerRadius(12)
+                        
+                        // 显示双方联系方式
+                        if let bidderContact = bid.bidderContact {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("Buyer's Contact")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                
+                                Text(bidderContact)
+                                    .font(.body)
+                                    .fontWeight(.semibold)
+                                    .padding(12)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .background(Color(.systemGray6))
+                                    .cornerRadius(8)
+                            }
+                        }
+                        
+                        if let ownerContact = bid.ownerContact {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("Your Contact")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                
+                                Text(ownerContact)
+                                    .font(.body)
+                                    .fontWeight(.semibold)
+                                    .padding(12)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .background(appGreen.opacity(0.1))
+                                    .cornerRadius(8)
+                            }
                         }
                     }
                     .padding(20)

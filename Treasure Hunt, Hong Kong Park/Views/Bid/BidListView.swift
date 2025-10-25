@@ -211,18 +211,39 @@ struct BidRow: View {
             // 买家头像
             ZStack {
                 Circle()
-                    .fill(appGreen.opacity(0.2))
+                    .fill(statusColor.opacity(0.2))
                 
                 Image(systemName: "person.fill")
                     .font(.system(size: 16))
-                    .foregroundColor(appGreen)
+                    .foregroundColor(statusColor)
             }
             .frame(width: 40, height: 40)
             
             VStack(alignment: .leading, spacing: 4) {
-                Text("@\(bid.bidderUsername)")
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
+                HStack(spacing: 6) {
+                    Text("@\(bid.bidderUsername)")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                    
+                    // 状态徽章
+                    if bid.status == .countered {
+                        Text("Countered")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.blue)
+                            .cornerRadius(4)
+                    } else if bid.status == .accepted {
+                        Text("Accepted")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(appGreen)
+                            .cornerRadius(4)
+                    }
+                }
                 
                 if let message = bid.bidderMessage, !message.isEmpty {
                     Text(message)
@@ -231,9 +252,19 @@ struct BidRow: View {
                         .lineLimit(2)
                 }
                 
-                Text(timeAgo(bid.createdAt))
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
+                HStack(spacing: 4) {
+                    Text(timeAgo(bid.updatedAt))
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                    
+                    // Counter offer提示
+                    if let counterAmount = bid.counterAmount {
+                        Text("• You: \(counterAmount)")
+                            .font(.caption2)
+                            .foregroundColor(.blue)
+                            .fontWeight(.semibold)
+                    }
+                }
             }
             
             Spacer()
@@ -241,14 +272,14 @@ struct BidRow: View {
             // 出价金额
             VStack(alignment: .trailing, spacing: 2) {
                 HStack(spacing: 4) {
-                    Text("\(bid.bidAmount)")
+                    Text("\(bid.counterAmount ?? bid.bidAmount)")
                         .font(.title3)
                         .fontWeight(.bold)
-                        .foregroundColor(appGreen)
+                        .foregroundColor(statusColor)
                     
                     Image(systemName: "star.fill")
                         .font(.system(size: 12))
-                        .foregroundColor(appGreen)
+                        .foregroundColor(statusColor)
                 }
                 
                 Text("Credits")
@@ -263,7 +294,24 @@ struct BidRow: View {
         .padding(12)
         .background(Color(.systemBackground))
         .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(statusColor.opacity(0.2), lineWidth: bid.status == .pending ? 0 : 1.5)
+        )
         .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
+    }
+    
+    var statusColor: Color {
+        switch bid.status {
+        case .pending:
+            return appGreen
+        case .countered:
+            return .blue
+        case .accepted:
+            return appGreen
+        default:
+            return .gray
+        }
     }
     
     func timeAgo(_ date: Date) -> String {
