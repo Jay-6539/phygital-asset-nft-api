@@ -529,7 +529,7 @@ struct CounterOfferView: View {
                     .foregroundColor(.primary)
                     .cornerRadius(12)
                     
-                    Button("Send Counter") {
+                    Button("Send") {
                         if let amount = Int(counterAmount), amount > 0 {
                             onSubmit(amount, message.isEmpty ? nil : message)
                         }

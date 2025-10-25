@@ -216,6 +216,14 @@ struct BidRow: View {
                 Image(systemName: "person.fill")
                     .font(.system(size: 16))
                     .foregroundColor(statusColor)
+                
+                // 未读指示器（仅pending状态显示）
+                if bid.status == .pending && isUnread {
+                    Circle()
+                        .fill(appGreen)
+                        .frame(width: 10, height: 10)
+                        .offset(x: 15, y: -15)
+                }
             }
             .frame(width: 40, height: 40)
             
@@ -223,11 +231,12 @@ struct BidRow: View {
                 HStack(spacing: 6) {
                     Text("@\(bid.bidderUsername)")
                         .font(.subheadline)
-                        .fontWeight(.semibold)
+                        .fontWeight(isUnread ? .bold : .semibold)
+                        .foregroundColor(isUnread ? .primary : .primary)
                     
                     // 状态徽章
                     if bid.status == .countered {
-                        Text("Countered")
+                        Text("You Countered")
                             .font(.system(size: 9, weight: .bold))
                             .foregroundColor(.white)
                             .padding(.horizontal, 6)
@@ -236,6 +245,14 @@ struct BidRow: View {
                             .cornerRadius(4)
                     } else if bid.status == .accepted {
                         Text("Accepted")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(appGreen)
+                            .cornerRadius(4)
+                    } else if bid.status == .pending && isUnread {
+                        Text("New")
                             .font(.system(size: 9, weight: .bold))
                             .foregroundColor(.white)
                             .padding(.horizontal, 6)
@@ -256,30 +273,43 @@ struct BidRow: View {
                     Text(timeAgo(bid.updatedAt))
                         .font(.caption2)
                         .foregroundColor(.secondary)
-                    
-                    // Counter offer提示
-                    if let counterAmount = bid.counterAmount {
-                        Text("• You: \(counterAmount)")
-                            .font(.caption2)
-                            .foregroundColor(.blue)
-                            .fontWeight(.semibold)
-                    }
                 }
             }
             
             Spacer()
             
-            // 出价金额
+            // 出价金额（只显示counter金额，如果有的话）
             VStack(alignment: .trailing, spacing: 2) {
-                HStack(spacing: 4) {
-                    Text("\(bid.counterAmount ?? bid.bidAmount)")
-                        .font(.title3)
-                        .fontWeight(.bold)
-                        .foregroundColor(statusColor)
-                    
-                    Image(systemName: "star.fill")
-                        .font(.system(size: 12))
-                        .foregroundColor(statusColor)
+                // 如果有counter，只显示counter金额
+                if let counterAmount = bid.counterAmount {
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("Your Price")
+                            .font(.system(size: 8))
+                            .foregroundColor(.secondary)
+                        
+                        HStack(spacing: 4) {
+                            Text("\(counterAmount)")
+                                .font(.title3)
+                                .fontWeight(.bold)
+                                .foregroundColor(statusColor)
+                            
+                            Image(systemName: "star.fill")
+                                .font(.system(size: 12))
+                                .foregroundColor(statusColor)
+                        }
+                    }
+                } else {
+                    // 无counter，显示原始bid
+                    HStack(spacing: 4) {
+                        Text("\(bid.bidAmount)")
+                            .font(.title3)
+                            .fontWeight(.bold)
+                            .foregroundColor(statusColor)
+                        
+                        Image(systemName: "star.fill")
+                            .font(.system(size: 12))
+                            .foregroundColor(statusColor)
+                    }
                 }
                 
                 Text("Credits")
@@ -299,6 +329,11 @@ struct BidRow: View {
                 .strokeBorder(statusColor.opacity(0.2), lineWidth: bid.status == .pending ? 0 : 1.5)
         )
         .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
+    }
+    
+    // 判断是否为未读（pending状态且创建时间在24小时内）
+    var isUnread: Bool {
+        bid.status == .pending && bid.createdAt.timeIntervalSinceNow > -86400
     }
     
     var statusColor: Color {
