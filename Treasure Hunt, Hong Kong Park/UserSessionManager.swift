@@ -70,8 +70,8 @@ class UserSessionManager: ObservableObject {
             KeychainManager.shared.save(key: "provider_id", value: providerId)
         }
         
-        // 初始化新用户Credits（1000积分）
-        CreditsManager.shared.initializeNewUser(user.username, initialCredits: 1000)
+        // 初始化新用户Credits（0积分）
+        CreditsManager.shared.initializeNewUser(user.username, initialCredits: 0)
         
         Logger.auth("Session saved: \(user.username) (sensitive data in Keychain)")
     }

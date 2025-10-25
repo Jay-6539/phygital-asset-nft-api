@@ -75,6 +75,7 @@ struct MarketView: View {
                             Logger.debug("🔄 Manual refresh triggered")
                             Task {
                                 await loadMarketData()
+                                await loadUserCredits() // 刷新Credits
                                 await loadUnreadBidCount()
                             }
                         }) {
@@ -246,8 +247,8 @@ struct MarketView: View {
         .onAppear {
             Task {
                 await loadMarketData()
+                await loadUserCredits() // 在loadMarketData后调用，确保topUsers已加载
                 await loadUnreadBidCount()
-                await loadUserCredits()
             }
         }
         // Building History overlay
@@ -301,14 +302,23 @@ struct MarketView: View {
             return
         }
         
-        // 从CreditsManager获取用户Credits
-        let credits = CreditsManager.shared.getCredits(for: username)
-        
-        await MainActor.run {
-            self.userCredits = credits
+        // Credits应该与Top Users的activity_score保持一致
+        // 优先从topUsers中获取，如果找不到则从CreditsManager
+        if let userStats = topUsers.first(where: { $0.username == username }) {
+            await MainActor.run {
+                self.userCredits = userStats.activityScore
+                // 同步到CreditsManager
+                CreditsManager.shared.setCredits(userStats.activityScore, for: username)
+            }
+            Logger.debug("💰 User credits synced from activity_score: \(userStats.activityScore) for @\(username)")
+        } else {
+            // Fallback: 从CreditsManager获取
+            let credits = CreditsManager.shared.getCredits(for: username)
+            await MainActor.run {
+                self.userCredits = credits
+            }
+            Logger.debug("💰 User credits loaded from CreditsManager: \(credits) for @\(username)")
         }
-        
-        Logger.debug("💰 User credits loaded: \(credits) for @\(username)")
     }
     
     // MARK: - 加载未读Bid数量
