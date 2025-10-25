@@ -22,6 +22,8 @@ struct MarketView: View {
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var selectedBuilding: BuildingWithStats? // 选中的建筑，显示历史记录
+    @State private var showBidList = false
+    @State private var unreadBidCount = 0
     
     var body: some View {
         VStack(spacing: 0) {
@@ -54,25 +56,40 @@ struct MarketView: View {
                 
                 Spacer()
                 
-                // 刷新按钮（占位符保持标题居中）
-                Button(action: {
-                    Logger.debug("🔄 Manual refresh triggered")
-                    Task {
-                        await loadMarketData()
+                HStack(spacing: 12) {
+                    // Bid通知按钮
+                    if let username = currentUsername {
+                        BidNotificationButton(
+                            unreadCount: unreadBidCount,
+                            appGreen: appGreen,
+                            action: {
+                                Logger.debug("🔔 Bid notification tapped")
+                                showBidList = true
+                            }
+                        )
                     }
-                }) {
-                    ZStack {
-                        Circle().fill(Color.white)
-                        Image(systemName: "arrow.clockwise")
-                            .font(.system(size: 16))
-                            .foregroundStyle(isLoading ? .gray : appGreen)
+                    
+                    // 刷新按钮
+                    Button(action: {
+                        Logger.debug("🔄 Manual refresh triggered")
+                        Task {
+                            await loadMarketData()
+                            await loadUnreadBidCount()
+                        }
+                    }) {
+                        ZStack {
+                            Circle().fill(Color.white)
+                            Image(systemName: "arrow.clockwise")
+                                .font(.system(size: 16))
+                                .foregroundStyle(isLoading ? .gray : appGreen)
+                        }
+                        .frame(width: 36, height: 36)
+                        .shadow(radius: 2)
+                        .rotationEffect(.degrees(isLoading ? 360 : 0))
+                        .animation(isLoading ? .linear(duration: 1).repeatForever(autoreverses: false) : .default, value: isLoading)
                     }
-                    .frame(width: 36, height: 36)
-                    .shadow(radius: 2)
-                    .rotationEffect(.degrees(isLoading ? 360 : 0))
-                    .animation(isLoading ? .linear(duration: 1).repeatForever(autoreverses: false) : .default, value: isLoading)
+                    .disabled(isLoading)
                 }
-                .disabled(isLoading)
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 16)
@@ -201,6 +218,7 @@ struct MarketView: View {
         .onAppear {
             Task {
                 await loadMarketData()
+                await loadUnreadBidCount()
             }
         }
         // Building History overlay
@@ -213,6 +231,37 @@ struct MarketView: View {
                     currentUsername: currentUsername
                 )
                 .transition(.move(edge: .trailing))
+            }
+        }
+        // Bid List overlay
+        .fullScreenCover(isPresented: $showBidList) {
+            // TODO: 实现BidListView
+            Text("Bid List View - Coming Soon")
+                .onTapGesture {
+                    showBidList = false
+                }
+        }
+    }
+    
+    // MARK: - 加载未读Bid数量
+    private func loadUnreadBidCount() async {
+        guard let username = currentUsername else {
+            await MainActor.run {
+                self.unreadBidCount = 0
+            }
+            return
+        }
+        
+        do {
+            let count = try await BidManager.shared.getUnreadBidCount(ownerUsername: username)
+            await MainActor.run {
+                self.unreadBidCount = count
+            }
+            Logger.debug("🔔 Unread bid count: \(count)")
+        } catch {
+            Logger.error("❌ Failed to load unread bid count: \(error.localizedDescription)")
+            await MainActor.run {
+                self.unreadBidCount = 0
             }
         }
     }
