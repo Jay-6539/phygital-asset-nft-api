@@ -23,6 +23,12 @@ struct BidInputView: View {
     @State private var isSubmitting = false
     @State private var showError = false
     @State private var errorMessage = ""
+    @State private var availableCredits = 0
+    
+    var canSubmit: Bool {
+        guard let amount = Int(bidAmount), amount > 0 else { return false }
+        return amount <= availableCredits && !message.isEmpty
+    }
     
     var body: some View {
         ZStack {
@@ -59,10 +65,26 @@ struct BidInputView: View {
                     VStack(spacing: 20) {
                         // 出价输入
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("Your Bid")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .textCase(.uppercase)
+                            HStack {
+                                Text("Your Bid")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .textCase(.uppercase)
+                                
+                                Spacer()
+                                
+                                // 可用余额显示
+                                HStack(spacing: 4) {
+                                    Text("Available:")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                    
+                                    Text("\(availableCredits)")
+                                        .font(.caption)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(appGreen)
+                                }
+                            }
                             
                             HStack(spacing: 8) {
                                 TextField("0", text: $bidAmount)
@@ -84,6 +106,18 @@ struct BidInputView: View {
                                         .foregroundColor(appGreen)
                                 }
                                 .padding(.horizontal, 8)
+                            }
+                            
+                            // 余额不足提示
+                            if let amount = Int(bidAmount), amount > availableCredits {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "exclamationmark.circle.fill")
+                                        .font(.caption)
+                                    Text("Insufficient credits. You need \(amount - availableCredits) more credits.")
+                                        .font(.caption)
+                                }
+                                .foregroundColor(.red)
+                                .padding(.horizontal, 4)
                             }
                         }
                         
@@ -180,14 +214,11 @@ struct BidInputView: View {
         } message: {
             Text(errorMessage)
         }
-    }
-    
-    // MARK: - Computed Properties
-    private var canSubmit: Bool {
-        guard let amount = Int(bidAmount), amount > 0 else {
-            return false
+        .onAppear {
+            // 加载用户Credits余额
+            availableCredits = CreditsManager.shared.getCredits(for: currentUsername)
+            Logger.debug("💰 Available credits for bid: \(availableCredits)")
         }
-        return true
     }
     
     // MARK: - Actions

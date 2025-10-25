@@ -162,7 +162,7 @@ struct TopUserRow: View {
                     .fontWeight(.bold)
                     .foregroundColor(appGreen)
                 
-                Text("points")
+                Text("credits")
                     .font(.caption2)
                     .foregroundColor(.secondary)
             }

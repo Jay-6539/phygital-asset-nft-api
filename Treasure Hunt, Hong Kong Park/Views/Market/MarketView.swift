@@ -294,12 +294,21 @@ struct MarketView: View {
     
     // MARK: - 加载用户Credits
     private func loadUserCredits() async {
-        // TODO: 从Supabase获取用户真实Credits
-        // 目前先设置为固定值，后续可以从users表查询
-        await MainActor.run {
-            self.userCredits = 0 // 默认0，后续实现真实Credits系统
+        guard let username = currentUsername else {
+            await MainActor.run {
+                self.userCredits = 0
+            }
+            return
         }
-        Logger.debug("💰 User credits: \(userCredits)")
+        
+        // 从CreditsManager获取用户Credits
+        let credits = CreditsManager.shared.getCredits(for: username)
+        
+        await MainActor.run {
+            self.userCredits = credits
+        }
+        
+        Logger.debug("💰 User credits loaded: \(credits) for @\(username)")
     }
     
     // MARK: - 加载未读Bid数量

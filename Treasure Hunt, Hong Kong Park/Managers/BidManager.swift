@@ -269,6 +269,19 @@ class BidManager {
             Logger.debug("🔄 Both parties accepted, transferring asset...")
             try await transferAssetOwnership(bid: bidData)
             
+            // 转移Credits（买家支付给卖家）
+            let finalAmount = bidData.counterAmount ?? bidData.bidAmount
+            Logger.debug("💸 Transferring \(finalAmount) credits from @\(bidData.bidderUsername) to @\(bidData.ownerUsername)")
+            
+            try CreditsManager.shared.transferCredits(
+                amount: finalAmount,
+                from: bidData.bidderUsername,
+                to: bidData.ownerUsername,
+                reason: "Asset \(bidData.recordId)"
+            )
+            
+            Logger.success("💰 Credits transfer completed!")
+            
             // 转移完成后，也拒绝其他所有pending的Bid
             Logger.debug("🚫 Asset transferred, rejecting all other bids for this asset...")
             try await rejectOtherBidsForAsset(
