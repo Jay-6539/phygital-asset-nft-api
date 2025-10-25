@@ -233,10 +233,10 @@ struct MarketView: View {
                 .transition(.move(edge: .trailing))
             }
         }
-        // Bid List overlay
+        // Bid Management overlay
         .fullScreenCover(isPresented: $showBidList) {
             if let username = currentUsername {
-                BidListView(
+                BidManagementView(
                     appGreen: appGreen,
                     currentUsername: username,
                     onClose: {

@@ -249,7 +249,7 @@ struct BidRow: View {
                             .foregroundColor(.white)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(appGreen)
+                            .background(appGreen)  // 原色
                             .cornerRadius(4)
                     } else if bid.status == .pending && isUnread {
                         Text("New")
@@ -257,7 +257,7 @@ struct BidRow: View {
                             .foregroundColor(.white)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(appGreen)
+                            .background(appGreen.opacity(0.5))  // 50%透明度
                             .cornerRadius(4)
                     }
                 }
