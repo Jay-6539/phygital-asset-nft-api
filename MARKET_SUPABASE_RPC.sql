@@ -42,15 +42,21 @@ BEGIN
     RETURN QUERY
     WITH all_users AS (
         -- 获取所有用户（包括没有asset的用户）
+        -- 1. 所有曾经check-in的用户
         SELECT DISTINCT username FROM asset_checkins
         UNION
-        SELECT DISTINCT from_user AS username FROM transfer_requests WHERE status = 'completed'
+        -- 2. 所有transfer_requests中的用户（无论状态）
+        SELECT DISTINCT from_user AS username FROM transfer_requests WHERE from_user IS NOT NULL
         UNION
-        SELECT DISTINCT to_user AS username FROM transfer_requests WHERE status = 'completed'
+        SELECT DISTINCT to_user AS username FROM transfer_requests WHERE to_user IS NOT NULL
         UNION
-        SELECT DISTINCT bidder_username AS username FROM bids WHERE status = 'completed'
+        -- 3. 所有bids中的用户（无论状态）
+        SELECT DISTINCT bidder_username AS username FROM bids WHERE bidder_username IS NOT NULL
         UNION
-        SELECT DISTINCT owner_username AS username FROM bids WHERE status = 'completed'
+        SELECT DISTINCT owner_username AS username FROM bids WHERE owner_username IS NOT NULL
+        UNION
+        -- 4. Oval Office用户
+        SELECT DISTINCT username FROM oval_office_checkins WHERE username IS NOT NULL
     )
     SELECT 
         au.username,
@@ -62,9 +68,15 @@ BEGIN
             (SELECT COUNT(*) FROM bids b WHERE b.owner_username = au.username AND b.status = 'completed'), 0
         ) as transfer_count,
         (
+            -- Building check-ins: 10分/个
             COALESCE((SELECT COUNT(*) FROM asset_checkins ac WHERE ac.username = au.username), 0) * 10 + 
+            -- Oval Office check-ins: 10分/个
+            COALESCE((SELECT COUNT(*) FROM oval_office_checkins oc WHERE oc.username = au.username), 0) * 10 +
+            -- 独立建筑数: 50分/个
             COALESCE((SELECT COUNT(DISTINCT building_id) FROM asset_checkins ac WHERE ac.username = au.username), 0) * 50 +
+            -- 通过transfer_requests完成的转让: 20分/次
             COALESCE((SELECT COUNT(*) FROM transfer_requests tr WHERE tr.from_user = au.username AND tr.status = 'completed'), 0) * 20 +
+            -- 通过bids完成的卖出: 20分/次
             COALESCE((SELECT COUNT(*) FROM bids b WHERE b.owner_username = au.username AND b.status = 'completed'), 0) * 20
         )::BIGINT as activity_score
     FROM all_users au
@@ -76,6 +88,27 @@ $$ LANGUAGE plpgsql;
 
 -- 测试查询:
 -- SELECT * FROM get_top_users(10);
+
+-- 调试查询 - 查看所有用户来源:
+/*
+WITH all_users_debug AS (
+    SELECT DISTINCT username, 'asset_checkins' as source FROM asset_checkins
+    UNION ALL
+    SELECT DISTINCT from_user AS username, 'transfer_from' as source FROM transfer_requests WHERE from_user IS NOT NULL
+    UNION ALL
+    SELECT DISTINCT to_user AS username, 'transfer_to' as source FROM transfer_requests WHERE to_user IS NOT NULL
+    UNION ALL
+    SELECT DISTINCT bidder_username AS username, 'bid_buyer' as source FROM bids WHERE bidder_username IS NOT NULL
+    UNION ALL
+    SELECT DISTINCT owner_username AS username, 'bid_seller' as source FROM bids WHERE owner_username IS NOT NULL
+    UNION ALL
+    SELECT DISTINCT username, 'oval_office' as source FROM oval_office_checkins WHERE username IS NOT NULL
+)
+SELECT username, STRING_AGG(DISTINCT source, ', ') as sources
+FROM all_users_debug
+GROUP BY username
+ORDER BY username;
+*/
 
 
 -- 3. 获取Market总体统计
