@@ -404,8 +404,8 @@ struct MyBidsViewContent: View {
         do {
             let bids = try await BidManager.shared.getSentBids(bidderUsername: currentUsername)
             
-            // 计算未处理counter数量（countered状态）
-            let unreadCount = bids.filter { $0.status == .countered }.count
+            // 计算未处理数量（countered和accepted状态）
+            let unreadCount = bids.filter { $0.status == .countered || $0.status == .accepted }.count
             
             await MainActor.run {
                 self.sentBids = bids
