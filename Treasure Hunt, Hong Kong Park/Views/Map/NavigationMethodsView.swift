@@ -145,20 +145,13 @@ struct NavigationMethodButton: View {
     
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 2) {
-                Image(systemName: icon)
-                    .font(.caption)
-                    .foregroundColor(color)
-                
-                Text(title)
-                    .font(.caption2)
-                    .fontWeight(.medium)
-                    .foregroundColor(.primary)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 6)
-            .background(Color(.systemGray6))
-            .cornerRadius(4)
+            Image(systemName: icon)
+                .font(.system(size: 24))
+                .foregroundColor(color)
+                .frame(maxWidth: .infinity)
+                .frame(height: 50)
+                .background(Color(.systemGray6))
+                .cornerRadius(8)
         }
     }
 }

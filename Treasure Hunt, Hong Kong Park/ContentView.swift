@@ -2188,61 +2188,64 @@ struct ContentView: View {
                     }
                 }
             
-            // 右下角三个小按钮
-            VStack(spacing: 10) {
-                // 指南针按钮 - 定位到用户位置
-                Button(action: { 
-                    centerOnUserLocation()
-                }) {
-                    ZStack {
-                        Circle().fill(Color.white)
-                        Image(systemName: "location.north.line")
-                            .font(.system(size: 16))
-                            .foregroundStyle(appGreen)
+            // 右下角三个小按钮 - 只在不显示Buy界面时显示
+            if !showReceiveTransferFromMap {
+                VStack(spacing: 10) {
+                    // 指南针按钮 - 定位到用户位置
+                    Button(action: { 
+                        centerOnUserLocation()
+                    }) {
+                        ZStack {
+                            Circle().fill(Color.white)
+                            Image(systemName: "location.north.line")
+                                .font(.system(size: 16))
+                                .foregroundStyle(appGreen)
+                        }
+                        .frame(width: 36, height: 36)
+                        .shadow(radius: 2)
                     }
-                    .frame(width: 36, height: 36)
-                    .shadow(radius: 2)
+                    
+                    // 恢复初始状态按钮
+                    Button(action: { 
+                        restoreInitialMapState()
+                    }) {
+                        ZStack {
+                            Circle().fill(Color.white)
+                            Image(systemName: "arrow.counterclockwise")
+                                .font(.system(size: 16))
+                                .foregroundStyle(appGreen)
+                        }
+                        .frame(width: 36, height: 36)
+                        .shadow(radius: 2)
+                    }
+                    
+                    // 搜索按钮 - 切换搜索框显示/隐藏
+                    Button(action: { 
+                        showSearch.toggle()
+                        if !showSearch {
+                            // 关闭搜索框时清空搜索内容
+                            searchText = ""
+                            clearSearch()
+                        }
+                    }) {
+                        ZStack {
+                            Circle().fill(Color.white)
+                            Image(systemName: "magnifyingglass")
+                                .font(.system(size: 16))
+                                .foregroundStyle(appGreen)
+                        }
+                        .frame(width: 36, height: 36)
+                        .shadow(radius: 2)
+                    }
                 }
-                
-                // 恢复初始状态按钮
-                Button(action: { 
-                    restoreInitialMapState()
-                }) {
-                    ZStack {
-                        Circle().fill(Color.white)
-                        Image(systemName: "arrow.counterclockwise")
-                            .font(.system(size: 16))
-                            .foregroundStyle(appGreen)
-                    }
-                    .frame(width: 36, height: 36)
-                    .shadow(radius: 2)
-                }
-                
-                // 搜索按钮 - 切换搜索框显示/隐藏
-                Button(action: { 
-                    showSearch.toggle()
-                    if !showSearch {
-                        // 关闭搜索框时清空搜索内容
-                        searchText = ""
-                        clearSearch()
-                    }
-                }) {
-                    ZStack {
-                        Circle().fill(Color.white)
-                        Image(systemName: "magnifyingglass")
-                            .font(.system(size: 16))
-                            .foregroundStyle(appGreen)
-                    }
-                    .frame(width: 36, height: 36)
-                    .shadow(radius: 2)
-                }
+                .padding(.trailing, 16)
+                .padding(.bottom, 50)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                .zIndex(100)
             }
-            .padding(.trailing, 16)
-            .padding(.bottom, 50)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-            .zIndex(100)
-                
-                // 底部中央的扇形菜单按钮组
+            
+            // 底部中央的扇形菜单按钮组 - 只在不显示Buy界面和没有选中building时显示
+            if !showReceiveTransferFromMap && selectedTreasure == nil {
                 ZStack(alignment: .bottom) {
                     // 背景遮罩 - 点击关闭菜单
                     if showBottomMenu {
@@ -2403,9 +2406,10 @@ struct ContentView: View {
                 .padding(.bottom, 65)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                 .zIndex(200)
+            }
                 
-                // 搜索框覆盖层 - 完全独立，不影响右侧按键
-                if showSearch {
+            // 搜索框覆盖层 - 完全独立，不影响右侧按键
+            if showSearch {
                     // 搜索输入框 - 使用overlay方式，完全独立定位
                     VStack {
                         Spacer()
@@ -2523,7 +2527,7 @@ struct ContentView: View {
                                 .font(.headline)
                                 .foregroundStyle(.primary)
                             Spacer()
-                Button(action: {
+                            Button(action: {
                                 self.selectedTreasure = nil
                                 self.showClue = false // 同时关闭线索框
                                 
@@ -2553,10 +2557,10 @@ struct ContentView: View {
                                 }
                             }) {
                                 Image(systemName: "xmark")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .padding(4)
-                                    .background(Color.gray.opacity(0.1), in: Circle())
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundColor(.gray)
+                                    .frame(width: 28, height: 28)
+                                    .background(Color.clear)
                             }
                         }
                         
@@ -3015,81 +3019,79 @@ struct ContentView: View {
         .fullScreenCover(isPresented: $showNavigation) {
             // 导航模式的全屏地图
             ZStack {
-                    // 地图区域 - 限制底部范围
-                    VStack {
-                        Map(position: $cameraPosition) {
-                        // 用户位置 - 绿色圆点
-                        if let userLocation = locationManager.location {
-                            Annotation("Your Location", coordinate: userLocation.coordinate) {
-                                Circle()
-                                    .fill(appGreen)
-                                    .frame(width: 16, height: 16)
-                                    .overlay(
-                                        Circle()
-                                            .stroke(Color.white, lineWidth: 2)
-                                    )
-                                    .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
-                            }
+                Map(position: $cameraPosition) {
+                    // 用户位置 - 绿色圆点
+                    if let userLocation = locationManager.location {
+                        Annotation("Your Location", coordinate: userLocation.coordinate) {
+                            Circle()
+                                .fill(appGreen)
+                                .frame(width: 16, height: 16)
+                                .overlay(
+                                    Circle()
+                                        .stroke(Color.white, lineWidth: 2)
+                                )
+                                .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
                         }
-                        
-                        // 路线
-                        if let routePolyline {
-                            MapPolyline(routePolyline)
-                                .stroke(appGreen, lineWidth: 3)
-                        }
-                        
-                        // 只显示选中的目标建筑（隐藏其他建筑）
-                        if let selectedTreasure = selectedTreasure {
-                            Annotation(selectedTreasure.name, coordinate: selectedTreasure.coordinate) {
-                                // 目标建筑标记 - 使用无缝定位针
-                                VStack(spacing: 2) {
-                                    ZStack {
-                                        // 完整的定位针路径（无缝连接）
-                                        Path { path in
-                                            let center = CGPoint(x: 10, y: 8)
-                                            let radius: CGFloat = 8
-                                            
-                                            // 绘制圆形部分
-                                            path.addArc(
-                                                center: center,
-                                                radius: radius,
-                                                startAngle: .degrees(180),
-                                                endAngle: .degrees(0),
-                                                clockwise: false
-                                            )
-                                            
-                                            // 连接到三角形底部尖角
-                                            path.addLine(to: CGPoint(x: center.x, y: 24))
-                                            
-                                            // 回到圆形左侧
-                                            path.addLine(to: CGPoint(x: center.x - radius, y: center.y))
-                                            
-                                            path.closeSubpath()
-                                        }
-                                        .fill(selectedTreasure.districtColor)
+                    }
+                    
+                    // 路线
+                    if let routePolyline {
+                        MapPolyline(routePolyline)
+                            .stroke(appGreen, lineWidth: 3)
+                    }
+                    
+                    // 只显示选中的目标建筑（隐藏其他建筑）
+                    if let selectedTreasure = selectedTreasure {
+                        Annotation(selectedTreasure.name, coordinate: selectedTreasure.coordinate) {
+                            // 目标建筑标记 - 使用无缝定位针
+                            VStack(spacing: 2) {
+                                ZStack {
+                                    // 完整的定位针路径（无缝连接）
+                                    Path { path in
+                                        let center = CGPoint(x: 10, y: 8)
+                                        let radius: CGFloat = 8
                                         
-                                        // 白色中心点
-                                        Circle()
-                                            .fill(Color.white)
-                                            .frame(width: 6, height: 6)
-                                            .offset(x: 0, y: -8)
+                                        // 绘制圆形部分
+                                        path.addArc(
+                                            center: center,
+                                            radius: radius,
+                                            startAngle: .degrees(180),
+                                            endAngle: .degrees(0),
+                                            clockwise: false
+                                        )
+                                        
+                                        // 连接到三角形底部尖角
+                                        path.addLine(to: CGPoint(x: center.x, y: 24))
+                                        
+                                        // 回到圆形左侧
+                                        path.addLine(to: CGPoint(x: center.x - radius, y: center.y))
+                                        
+                                        path.closeSubpath()
                                     }
-                                    .frame(width: 20, height: 28)
-                                    .scaleEffect(1.5)  // 导航模式放大显示
-                                    .shadow(color: .black.opacity(0.5), radius: 3, x: 0, y: 2)
+                                    .fill(selectedTreasure.districtColor)
+                                    
+                                    // 白色中心点
+                                    Circle()
+                                        .fill(Color.white)
+                                        .frame(width: 6, height: 6)
+                                        .offset(x: 0, y: -8)
                                 }
+                                .frame(width: 20, height: 28)
+                                .scaleEffect(1.5)  // 导航模式放大显示
+                                .shadow(color: .black.opacity(0.5), radius: 3, x: 0, y: 2)
                             }
                         }
                     }
-                    .mapStyle(.standard)
-                    .onAppear {
-                        if let selectedTreasure = selectedTreasure,
-                           let userLocation = locationManager.location {
-                            calculateRoute(from: userLocation.coordinate, to: selectedTreasure.coordinate)
-                        }
+                }
+                .mapStyle(.standard)
+                .onAppear {
+                    if let selectedTreasure = selectedTreasure,
+                       let userLocation = locationManager.location {
+                        calculateRoute(from: userLocation.coordinate, to: selectedTreasure.coordinate)
                     }
-                    .padding(.bottom, 50)  // 地图下边缘向上提升50像素
-                    .zIndex(0)  // 地图层在最底部
+                }
+                .ignoresSafeArea()  // 地图全屏显示
+                .zIndex(0)  // 地图层在最底部
                 
                 // 返回按钮
                 VStack {
@@ -3129,7 +3131,7 @@ struct ContentView: View {
                                         Text("TAP and Explore this Phygital Asset")
                                             .font(.subheadline)
                                             .fontWeight(.medium)
-                                            .foregroundColor(appGreen)
+                                            .foregroundColor(.white)
                                             .frame(width: 280, height: 35)
                                             .background {
                                                 ZStack {
@@ -3460,7 +3462,6 @@ struct ContentView: View {
                     .zIndex(2000)  // 确保输入框显示在所有内容之上
                 }
             }
-        }
         }
     }
     
