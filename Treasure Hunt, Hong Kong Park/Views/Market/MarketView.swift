@@ -257,12 +257,21 @@ struct MarketView: View {
         }
         
         do {
-            let count = try await BidManager.shared.getUnreadBidCount(ownerUsername: username)
+            // 计算卖家收到的pending Bid
+            let receivedCount = try await BidManager.shared.getUnreadBidCount(ownerUsername: username)
+            
+            // 计算买家收到的accepted/countered Bid
+            let sentBids = try await BidManager.shared.getSentBids(bidderUsername: username)
+            let sentUnreadCount = sentBids.filter { $0.status == .countered || $0.status == .accepted }.count
+            
+            // 总未读数 = 收到的pending + 发出的countered/accepted
+            let totalCount = receivedCount + sentUnreadCount
+            
             await MainActor.run {
-                self.unreadBidCount = count
-                onBidCountUpdate?(count)
+                self.unreadBidCount = totalCount
+                onBidCountUpdate?(totalCount)
             }
-            Logger.debug("🔔 Unread bid count: \(count)")
+            Logger.debug("🔔 Total unread bid count: \(totalCount) (received: \(receivedCount), sent: \(sentUnreadCount))")
         } catch {
             Logger.error("❌ Failed to load unread bid count: \(error.localizedDescription)")
             await MainActor.run {

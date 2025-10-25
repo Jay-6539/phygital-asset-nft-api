@@ -23,6 +23,12 @@ struct BidDetailView: View {
     @State private var showError = false
     @State private var errorMessage = ""
     
+    // 资产信息
+    @State private var assetImageUrl: String?
+    @State private var assetDescription: String?
+    @State private var assetName: String?
+    @State private var isLoadingAsset = false
+    
     var body: some View {
         ZStack {
             Color.black.opacity(0.4)
@@ -89,6 +95,81 @@ struct BidDetailView: View {
                 // 内容区域
                 ScrollView {
                     VStack(spacing: 20) {
+                        // 资产信息卡片
+                        VStack(spacing: 16) {
+                            HStack {
+                                Text("Asset Being Offered")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .textCase(.uppercase)
+                                
+                                Spacer()
+                            }
+                            
+                            if isLoadingAsset {
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                                    .frame(height: 120)
+                            } else {
+                                HStack(spacing: 12) {
+                                    // 资产图片
+                                    if let imageUrl = assetImageUrl, !imageUrl.isEmpty {
+                                        AsyncImage(url: URL(string: imageUrl)) { phase in
+                                            switch phase {
+                                            case .success(let image):
+                                                image
+                                                    .resizable()
+                                                    .aspectRatio(contentMode: .fill)
+                                            case .failure(_), .empty:
+                                                ZStack {
+                                                    Rectangle()
+                                                        .fill(Color(.systemGray5))
+                                                    Image(systemName: "photo")
+                                                        .font(.system(size: 24))
+                                                        .foregroundColor(.gray)
+                                                }
+                                            @unknown default:
+                                                EmptyView()
+                                            }
+                                        }
+                                        .frame(width: 80, height: 80)
+                                        .cornerRadius(12)
+                                    } else {
+                                        ZStack {
+                                            Rectangle()
+                                                .fill(appGreen.opacity(0.1))
+                                            Image(systemName: "building.2.fill")
+                                                .font(.system(size: 28))
+                                                .foregroundColor(appGreen.opacity(0.6))
+                                        }
+                                        .frame(width: 80, height: 80)
+                                        .cornerRadius(12)
+                                    }
+                                    
+                                    // 资产信息
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        if let name = assetName, !name.isEmpty {
+                                            Text(name)
+                                                .font(.headline)
+                                                .foregroundColor(.primary)
+                                        }
+                                        
+                                        if let desc = assetDescription, !desc.isEmpty {
+                                            Text(desc)
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                                .lineLimit(3)
+                                        }
+                                    }
+                                    
+                                    Spacer()
+                                }
+                            }
+                        }
+                        .padding(16)
+                        .background(Color(.systemGray6))
+                        .cornerRadius(12)
+                        
                         // 出价金额
                         VStack(spacing: 12) {
                             Text("Offer Amount")
@@ -361,6 +442,57 @@ struct BidDetailView: View {
             Button("OK") { showError = false }
         } message: {
             Text(errorMessage)
+        }
+        .onAppear {
+            loadAssetInfo()
+        }
+    }
+    
+    // MARK: - Load Asset Info
+    private func loadAssetInfo() {
+        isLoadingAsset = true
+        
+        Task {
+            do {
+                let tableName = bid.recordType == "building" ? "asset_checkins" : "oval_office_checkins"
+                let endpoint = "\(tableName)?id=eq.\(bid.recordId.uuidString.lowercased())&select=image_url,description,asset_name"
+                
+                let data = try await NetworkManager.shared.request(
+                    url: URL(string: "\(SupabaseConfig.url)/rest/v1/\(endpoint)")!,
+                    method: "GET",
+                    headers: [
+                        "apikey": SupabaseConfig.anonKey,
+                        "Authorization": "Bearer \(SupabaseConfig.anonKey)"
+                    ],
+                    timeout: 30,
+                    retries: 2
+                )
+                
+                if let jsonString = String(data: data, encoding: .utf8),
+                   let jsonData = jsonString.data(using: .utf8),
+                   let records = try? JSONSerialization.jsonObject(with: jsonData) as? [[String: Any]],
+                   let record = records.first {
+                    
+                    await MainActor.run {
+                        self.assetImageUrl = record["image_url"] as? String
+                        self.assetDescription = record["description"] as? String
+                        self.assetName = record["asset_name"] as? String
+                        self.isLoadingAsset = false
+                    }
+                    
+                    Logger.debug("✅ Asset info loaded for bid: \(bid.id)")
+                } else {
+                    await MainActor.run {
+                        self.isLoadingAsset = false
+                    }
+                    Logger.warning("⚠️ No asset info found for record: \(bid.recordId)")
+                }
+            } catch {
+                Logger.error("❌ Failed to load asset info: \(error)")
+                await MainActor.run {
+                    self.isLoadingAsset = false
+                }
+            }
         }
     }
     
