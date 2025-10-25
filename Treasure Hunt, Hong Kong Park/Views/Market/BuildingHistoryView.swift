@@ -137,7 +137,7 @@ struct BuildingHistoryView: View {
                             ForEach(ovalRecords) { record in
                                 CompactHistoryRow(
                                     username: record.username,
-                                    description: record.description.isEmpty ? record.assetName : record.description,
+                                    description: record.description.isEmpty ? (record.assetName ?? "") : record.description,
                                     createdAt: record.createdAt,
                                     appGreen: appGreen,
                                     isOvalOffice: true
@@ -186,8 +186,8 @@ struct BuildingHistoryView: View {
         Task {
             do {
                 // 并行加载建筑和Oval Office记录
-                async let buildingTask = BuildingCheckInManager.shared.loadCheckIns(forBuilding: building.id)
-                async let ovalTask = OvalOfficeCheckInManager.shared.loadCheckIns(forBuilding: building.id)
+                async let buildingTask = BuildingCheckInManager.shared.getCheckIns(for: building.id)
+                async let ovalTask = OvalOfficeCheckInManager.shared.getCheckIns(for: building.id)
                 
                 let (buildings, ovals) = try await (buildingTask, ovalTask)
                 
