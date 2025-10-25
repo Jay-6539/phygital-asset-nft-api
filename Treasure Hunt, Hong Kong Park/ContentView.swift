@@ -5421,10 +5421,10 @@ struct ContentView: View {
             }
             .onAppear {
                 // 加载未读Bid数量
-                if let currentUsername = username {
+                if !username.isEmpty {
                     Task {
                         do {
-                            let count = try await BidManager.shared.getUnreadBidCount(ownerUsername: currentUsername)
+                            let count = try await BidManager.shared.getUnreadBidCount(ownerUsername: username)
                             await MainActor.run {
                                 self.unreadBidCount = count
                             }
