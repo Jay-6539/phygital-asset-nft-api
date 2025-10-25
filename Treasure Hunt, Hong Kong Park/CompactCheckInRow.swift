@@ -45,3 +45,4 @@ struct CompactCheckInRow: View {
 }
 
 
+

@@ -25,6 +25,8 @@ struct AssetInputModal: View {
     @State private var displayTitle: String = "Asset Information"
     @State private var displayInputText: String = "INPUT"
     @State private var showingPhotoOptions = false
+    @State private var localImage: UIImage? = nil // 本地图片缓存，避免直接更新binding导致Metal冲突
+    @State private var isProcessingPhoto = false // 防止重复调用相机
     
     var body: some View {
         VStack(spacing: 0) {
@@ -43,6 +45,7 @@ struct AssetInputModal: View {
                     Image(systemName: "xmark")
                         .font(.title3)
                         .foregroundColor(.gray)
+                        .frame(width: 44, height: 44)
                 }
             }
             .padding(.horizontal, 20)
@@ -78,12 +81,9 @@ struct AssetInputModal: View {
                             
                             // 可点击的照片框，占据整个宽度
                             Button(action: {
-                                Logger.debug("📸 照片按钮被点击")
-                                Logger.debug("当前 showingPhotoOptions: \(showingPhotoOptions)")
                                 showingPhotoOptions = true
-                                Logger.debug("设置后 showingPhotoOptions: \(showingPhotoOptions)")
                             }) {
-                                if let image = assetImage {
+                                if let image = localImage ?? assetImage {
                                     Image(uiImage: image)
                                         .resizable()
                                         .aspectRatio(contentMode: .fill)
@@ -192,87 +192,75 @@ struct AssetInputModal: View {
             }
         .background(Color(.systemBackground))
         .cornerRadius(20)
-        .sheet(isPresented: Binding(
-            get: { 
-                let showing = showingImagePicker || showingCamera
-                if showing {
-                    Logger.debug("📸 ImagePicker sheet 将显示: picker=\(showingImagePicker), camera=\(showingCamera)")
-                }
-                return showing
-            },
-            set: { newValue in
-                Logger.debug("📸 ImagePicker sheet 状态变化: \(newValue)")
-                if !newValue {
-                    // 延迟重置，确保相机完全关闭
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+        .sheet(isPresented: $showingImagePicker) {
+            ImagePicker(image: $localImage, sourceType: sourceType)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .onDisappear {
+                    print("📸 ImagePicker onDisappear - resetting states")
+                    print("📸   showingImagePicker: \(showingImagePicker)")
+                    print("📸   showingCamera: \(showingCamera)")
+                    
+                    // 延迟重置状态，确保sheet完全关闭
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                         self.showingImagePicker = false
                         self.showingCamera = false
-                        Logger.debug("📸 重置 showingImagePicker 和 showingCamera")
+                        self.isProcessingPhoto = false
                     }
+                }
+        }
+        .sheet(isPresented: $showingCamera) {
+            ImagePicker(image: $localImage, sourceType: sourceType)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .onDisappear {
+                    print("📸 Camera sheet onDisappear - resetting states")
+                    
+                    // 延迟重置状态，确保sheet完全关闭
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        self.showingImagePicker = false
+                        self.showingCamera = false
+                        self.isProcessingPhoto = false
+                    }
+                }
+        }
+        .onChange(of: localImage) { oldValue, newValue in
+            // 图片选择完成后，延迟更新到binding，避免Metal冲突
+            if newValue != nil {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    self.assetImage = newValue
+                    // 确保在处理完成后重置标志
+                    self.isProcessingPhoto = false
                 }
             }
-        )) {
-            ImagePicker(image: $assetImage, sourceType: sourceType)
-                .onAppear {
-                    Logger.debug("📸 ImagePicker 已显示，sourceType: \(sourceType == .camera ? "Camera" : "PhotoLibrary")")
+        }
+        .confirmationDialog("Select Photo", isPresented: $showingPhotoOptions, titleVisibility: .visible) {
+            Button("Upload Photo") {
+                guard !isProcessingPhoto else { return }
+                isProcessingPhoto = true
+                sourceType = .photoLibrary
+                showingImagePicker = true
+            }
+            
+            Button("Take Photo") {
+                print("📸 Take Photo button tapped, isProcessingPhoto: \(isProcessingPhoto)")
+                guard !isProcessingPhoto else { 
+                    print("📸 ❌ Already processing photo, ignoring")
+                    return 
                 }
-                .onDisappear {
-                    Logger.debug("📸 ImagePicker 已消失")
-                    // 确保sheet关闭后状态被重置
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        self.showingImagePicker = false
-                        self.showingCamera = false
-                        Logger.debug("📸 延迟重置完成")
-                    }
+                if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                    print("📸 ✅ Setting up camera")
+                    isProcessingPhoto = true
+                    sourceType = .camera
+                    showingCamera = true
+                } else {
+                    print("📸 ❌ Camera not available")
+                    showCameraUnavailableAlert = true
                 }
-        }
-        .actionSheet(isPresented: $showingPhotoOptions) {
-            ActionSheet(
-                title: Text("Select Photo"),
-                buttons: [
-                    .default(Text("Upload Photo")) {
-                        Logger.debug("📸 用户选择：上传照片")
-                        // 延迟打开，避免与 actionSheet 关闭冲突
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                            self.sourceType = .photoLibrary
-                            self.showingImagePicker = true
-                            Logger.debug("📸 设置 showingImagePicker = true")
-                        }
-                    },
-                    .default(Text("Take Photo")) {
-                        Logger.debug("📸 用户选择：拍照")
-                        if UIImagePickerController.isSourceTypeAvailable(.camera) {
-                            Logger.debug("📸 相机可用")
-                            // 延迟打开相机，避免与 actionSheet 关闭冲突
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                                self.sourceType = .camera
-                                self.showingCamera = true
-                                Logger.debug("📸 设置 showingCamera = true")
-                            }
-                        } else {
-                            Logger.error("📸 相机不可用")
-                            showCameraUnavailableAlert = true
-                        }
-                    },
-                    .cancel(Text("Cancel")) {
-                        Logger.debug("📸 用户取消选择照片")
-                    }
-                ]
-            )
-        }
-        .onChange(of: showingPhotoOptions) { oldValue, newValue in
-            Logger.debug("📸 showingPhotoOptions 变化: \(oldValue) -> \(newValue)")
-        }
-        .onChange(of: showingImagePicker) { oldValue, newValue in
-            Logger.debug("📸 showingImagePicker 变化: \(oldValue) -> \(newValue)")
-        }
-        .onChange(of: showingCamera) { oldValue, newValue in
-            Logger.debug("📸 showingCamera 变化: \(oldValue) -> \(newValue)")
-        }
-        .onChange(of: assetImage) { oldValue, newValue in
-            Logger.debug("📸 assetImage 变化: \(oldValue != nil ? "有图片" : "无") -> \(newValue != nil ? "有图片" : "无")")
-            if newValue != nil {
-                Logger.success("📸 照片已选择/拍摄成功！")
+            }
+            
+            Button("Cancel", role: .cancel) {
+                isProcessingPhoto = false
             }
         }
         .alert("Camera Unavailable", isPresented: $showCameraUnavailableAlert) {
@@ -281,8 +269,9 @@ struct AssetInputModal: View {
             Text("Your device camera is not available or permission is restricted.")
         }
         .onAppear {
-            // 初始化显示标题
+            // 初始化显示标题和本地图片缓存
             displayTitle = assetName.isEmpty ? "Asset Information" : assetName
+            localImage = assetImage
         }
     }
 }

@@ -50,5 +50,7 @@
 	<string>$(HISTORIC_BUILDINGS_URL)</string>
 	<key>HISTORIC_BUILDINGS_KEY</key>
 	<string>$(HISTORIC_BUILDINGS_KEY)</string>
+	<key>NSCameraUsageDescription</key>
+	<string>We need camera access to scan QR codes for receiving transfers</string>
 </dict>
 </plist>

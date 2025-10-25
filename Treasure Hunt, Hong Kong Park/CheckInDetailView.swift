@@ -12,9 +12,13 @@ struct CheckInDetailView: View {
     let appGreen: Color
     let onClose: () -> Void
     let onNavigate: ((Double, Double) -> Void)? // 新增：导航回调
+    let currentUsername: String? // 当前用户名，用于判断是否可以转让
     
     @State private var image: UIImage? = nil
     @State private var isLoadingImage = false
+    @State private var showTransferView = false
+    @State private var transferRequest: TransferRequest?
+    @State private var isCreatingTransfer = false
     
     var body: some View {
         ZStack {
@@ -29,14 +33,6 @@ struct CheckInDetailView: View {
             VStack(spacing: 0) {
                 // 头部
                 HStack {
-                    Button(action: onClose) {
-                        Image(systemName: "xmark")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .padding(4)
-                            .background(Color.gray.opacity(0.1), in: Circle())
-                    }
-                    
                     Spacer()
                     
                     Text("Check-in Details")
@@ -45,11 +41,12 @@ struct CheckInDetailView: View {
                     
                     Spacer()
                     
-                    // 占位符
-                    Image(systemName: "xmark")
-                        .font(.caption)
-                        .padding(4)
-                        .opacity(0)
+                    Button(action: onClose) {
+                        Image(systemName: "xmark")
+                            .font(.title3)
+                            .foregroundColor(.gray)
+                            .frame(width: 44, height: 44)
+                    }
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 20)
@@ -183,6 +180,61 @@ struct CheckInDetailView: View {
                             Text(checkIn.username)
                                 .font(.body)
                         }
+                        
+                        // Transfer按钮 - 仅当是自己的记录时显示
+                        if let username = currentUsername, username == checkIn.username {
+                            Divider()
+                                .padding(.vertical, 8)
+                            
+                            Button(action: {
+                                startTransfer()
+                            }) {
+                                HStack(spacing: 12) {
+                                    if isCreatingTransfer {
+                                        ProgressView()
+                                            .progressViewStyle(CircularProgressViewStyle(tint: appGreen))
+                                    } else {
+                                        Text("Transfer")
+                                            .font(.headline)
+                                            .foregroundColor(appGreen)
+                                    }
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background {
+                                    ZStack {
+                                        Color.clear.background(.ultraThinMaterial)
+                                        LinearGradient(
+                                            gradient: Gradient(colors: [
+                                                appGreen.opacity(0.15),
+                                                appGreen.opacity(0.05)
+                                            ]),
+                                            startPoint: .top,
+                                            endPoint: .bottom
+                                        )
+                                    }
+                                }
+                                .cornerRadius(12)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .strokeBorder(
+                                            LinearGradient(
+                                                gradient: Gradient(stops: [
+                                                    .init(color: Color.white.opacity(0.6), location: 0.0),
+                                                    .init(color: Color.white.opacity(0.0), location: 0.3),
+                                                    .init(color: appGreen.opacity(0.2), location: 0.7),
+                                                    .init(color: appGreen.opacity(0.4), location: 1.0)
+                                                ]),
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            ),
+                                            lineWidth: 1.5
+                                        )
+                                )
+                                .shadow(color: appGreen.opacity(0.2), radius: 4, x: 0, y: 2)
+                            }
+                            .disabled(isCreatingTransfer)
+                        }
                     }
                     .padding(20)
                 }
@@ -192,6 +244,23 @@ struct CheckInDetailView: View {
             .background(Color(.systemBackground))
             .cornerRadius(20)
             .shadow(radius: 20)
+            
+            // 转让界面overlay
+            if showTransferView, let request = transferRequest {
+                TransferQRView(
+                    transferRequest: request,
+                    appGreen: appGreen,
+                    onClose: {
+                        showTransferView = false
+                        transferRequest = nil
+                    },
+                    onCancel: {
+                        showTransferView = false
+                        transferRequest = nil
+                        onClose()
+                    }
+                )
+            }
         }
         .onAppear {
             loadImage()
@@ -213,6 +282,35 @@ struct CheckInDetailView: View {
             } catch {
                 await MainActor.run {
                     self.isLoadingImage = false
+                }
+            }
+        }
+    }
+    
+    private func startTransfer() {
+        guard let username = currentUsername else {
+            Logger.error("Cannot transfer: no current username")
+            return
+        }
+        
+        isCreatingTransfer = true
+        
+        Task {
+            do {
+                let request = try await TransferManager.shared.createBuildingTransfer(
+                    checkIn: checkIn,
+                    fromUser: username
+                )
+                
+                await MainActor.run {
+                    self.transferRequest = request
+                    self.isCreatingTransfer = false
+                    self.showTransferView = true
+                }
+            } catch {
+                Logger.error("Failed to create transfer: \(error.localizedDescription)")
+                await MainActor.run {
+                    self.isCreatingTransfer = false
                 }
             }
         }

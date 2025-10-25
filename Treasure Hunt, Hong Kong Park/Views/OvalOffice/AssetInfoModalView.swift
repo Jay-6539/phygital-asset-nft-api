@@ -49,7 +49,8 @@ struct AssetInfoModalView: View {
                     }) {
                         Image(systemName: "xmark")
                             .font(.title3)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(.gray)
+                            .frame(width: 44, height: 44)
                     }
                 }
                 .padding(.horizontal, 20)
@@ -476,7 +477,8 @@ struct UserDetailModalView: View {
                         }) {
                             Image(systemName: "xmark")
                                 .font(.title3)
-                                .foregroundColor(.secondary)
+                                .foregroundColor(.gray)
+                                .frame(width: 44, height: 44)
                         }
                     }
                     

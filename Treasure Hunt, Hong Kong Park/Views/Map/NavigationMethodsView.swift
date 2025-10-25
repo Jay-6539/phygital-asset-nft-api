@@ -44,7 +44,12 @@ struct NavigationMethodsView: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
             .background(Color(.systemBackground))
-            .cornerRadius(6, corners: [.topLeft, .topRight])
+            .clipShape(
+                .rect(
+                    topLeadingRadius: 6,
+                    topTrailingRadius: 6
+                )
+            )
             
             // 交通方式按钮
             VStack(spacing: 6) {
@@ -105,8 +110,20 @@ struct NavigationMethodsView: View {
         let destinationItem = MKMapItem(placemark: destinationPlacemark)
         destinationItem.name = building.name
         
+        let directionMode: String
+        switch transportType {
+        case .automobile:
+            directionMode = MKLaunchOptionsDirectionsModeDriving
+        case .walking:
+            directionMode = MKLaunchOptionsDirectionsModeWalking
+        case .transit:
+            directionMode = MKLaunchOptionsDirectionsModeTransit
+        default:
+            directionMode = MKLaunchOptionsDirectionsModeDriving
+        }
+        
         let launchOptions: [String: Any] = [
-            MKLaunchOptionsDirectionsModeKey: transportType.appleMapsDirectionMode,
+            MKLaunchOptionsDirectionsModeKey: directionMode,
             MKLaunchOptionsShowsTrafficKey: true
         ]
         
@@ -115,7 +132,7 @@ struct NavigationMethodsView: View {
             launchOptions: launchOptions
         )
         
-        print("🗺️ Opening Apple Maps - \(transportType.description) to \(building.name)")
+        print("🗺️ Opening Apple Maps to \(building.name)")
     }
 }
 
