@@ -131,18 +131,40 @@ struct TradedRecordDetailView: View {
                             }) {
                                 Text("Bid")
                                     .font(.headline)
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(.white)
+                                    .foregroundColor(appGreen)
                                     .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 16)
+                                    .padding()
                                     .background {
                                         ZStack {
                                             Color.clear.background(.ultraThinMaterial)
-                                            appGreen.opacity(0.8)
+                                            LinearGradient(
+                                                gradient: Gradient(colors: [
+                                                    appGreen.opacity(0.15),
+                                                    appGreen.opacity(0.05)
+                                                ]),
+                                                startPoint: .top,
+                                                endPoint: .bottom
+                                            )
                                         }
                                     }
                                     .cornerRadius(12)
-                                    .shadow(color: appGreen.opacity(0.3), radius: 8, x: 0, y: 4)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .strokeBorder(
+                                                LinearGradient(
+                                                    gradient: Gradient(stops: [
+                                                        .init(color: Color.white.opacity(0.6), location: 0.0),
+                                                        .init(color: Color.white.opacity(0.0), location: 0.3),
+                                                        .init(color: appGreen.opacity(0.2), location: 0.7),
+                                                        .init(color: appGreen.opacity(0.4), location: 1.0)
+                                                    ]),
+                                                    startPoint: .topLeading,
+                                                    endPoint: .bottomTrailing
+                                                ),
+                                                lineWidth: 1.5
+                                            )
+                                    )
+                                    .shadow(color: appGreen.opacity(0.2), radius: 4, x: 0, y: 2)
                             }
                         }
                     }
