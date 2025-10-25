@@ -46,24 +46,24 @@ struct StatCard: View {
     let color: Color
     
     var body: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 4) {
             Image(systemName: icon)
-                .font(.system(size: 22))
+                .font(.system(size: 16))
                 .foregroundColor(color)
             
             Text(value)
-                .font(.title3)
+                .font(.headline)
                 .fontWeight(.bold)
                 .foregroundColor(.primary)
             
             Text(title)
-                .font(.caption2)
+                .font(.system(size: 9))
                 .foregroundColor(.secondary)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 12)
+        .padding(.vertical, 8)
         .background(.ultraThinMaterial)
-        .cornerRadius(12)
+        .cornerRadius(10)
         .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
     }
 }

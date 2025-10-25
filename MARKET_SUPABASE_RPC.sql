@@ -110,20 +110,33 @@ BEGIN
         ac.image_url,
         ac.username,
         COALESCE(
+            -- 统计transfer_requests和bids两个来源的交易
             (SELECT COUNT(*) 
              FROM transfer_requests tr 
              WHERE tr.record_id::text = ac.id::text
              AND tr.record_type = 'building'
              AND tr.status = 'completed'
+            ) +
+            (SELECT COUNT(*)
+             FROM bids b
+             WHERE b.record_id = ac.id
+             AND b.record_type = 'building'
+             AND b.status = 'completed'
             ), 0
         ) as transfer_count,
         ac.created_at,
         ac.description as notes  -- asset_checkins表中字段是description
     FROM asset_checkins ac
     WHERE ac.id::text IN (
-        -- 只选择有转账记录的check-ins
+        -- 选择有transfer_requests记录的
         SELECT DISTINCT record_id 
         FROM transfer_requests 
+        WHERE record_type = 'building'
+        AND status = 'completed'
+    ) OR ac.id IN (
+        -- 或选择有completed bids的
+        SELECT DISTINCT record_id
+        FROM bids
         WHERE record_type = 'building'
         AND status = 'completed'
     )

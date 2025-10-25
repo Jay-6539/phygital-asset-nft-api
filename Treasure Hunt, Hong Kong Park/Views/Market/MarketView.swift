@@ -30,60 +30,66 @@ struct MarketView: View {
     var body: some View {
         VStack(spacing: 0) {
             // MARK: - 顶部导航栏
-            HStack {
-                // 返回按钮
-                Button(action: onClose) {
-                    ZStack {
-                        Circle().fill(Color.white)
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(.black)
+            ZStack {
+                // 左侧：返回按钮
+                HStack {
+                    Button(action: onClose) {
+                        ZStack {
+                            Circle().fill(Color.white)
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(.black)
+                        }
+                        .frame(width: 36, height: 36)
+                        .shadow(radius: 2)
                     }
-                    .frame(width: 36, height: 36)
-                    .shadow(radius: 2)
+                    
+                    Spacer()
                 }
                 
-                Spacer()
-                
+                // 中间：标题（绝对居中）
                 Text("Market")
                     .font(.title2)
                     .fontWeight(.bold)
                 
-                Spacer()
-                
-                HStack(spacing: 12) {
-                    // Bid通知按钮
-                    if currentUsername != nil {
-                        BidNotificationButton(
-                            unreadCount: unreadBidCount,
-                            appGreen: appGreen,
-                            action: {
-                                Logger.debug("🔔 Bid notification tapped")
-                                showBidList = true
-                            }
-                        )
-                    }
+                // 右侧：功能按钮
+                HStack {
+                    Spacer()
                     
-                    // 刷新按钮
-                    Button(action: {
-                        Logger.debug("🔄 Manual refresh triggered")
-                        Task {
-                            await loadMarketData()
-                            await loadUnreadBidCount()
+                    HStack(spacing: 12) {
+                        // Bid通知按钮
+                        if currentUsername != nil {
+                            BidNotificationButton(
+                                unreadCount: unreadBidCount,
+                                appGreen: appGreen,
+                                action: {
+                                    Logger.debug("🔔 Bid notification tapped")
+                                    showBidList = true
+                                }
+                            )
                         }
-                    }) {
-                        ZStack {
-                            Circle().fill(Color.white)
-                            Image(systemName: "arrow.clockwise")
-                                .font(.system(size: 16))
-                                .foregroundStyle(isLoading ? .gray : appGreen)
+                        
+                        // 刷新按钮
+                        Button(action: {
+                            Logger.debug("🔄 Manual refresh triggered")
+                            Task {
+                                await loadMarketData()
+                                await loadUnreadBidCount()
+                            }
+                        }) {
+                            ZStack {
+                                Circle().fill(Color.white)
+                                Image(systemName: "arrow.clockwise")
+                                    .font(.system(size: 16))
+                                    .foregroundStyle(isLoading ? .gray : appGreen)
+                            }
+                            .frame(width: 36, height: 36)
+                            .shadow(radius: 2)
+                            .rotationEffect(.degrees(isLoading ? 360 : 0))
+                            .animation(isLoading ? .linear(duration: 1).repeatForever(autoreverses: false) : .default, value: isLoading)
                         }
-                        .frame(width: 36, height: 36)
-                        .shadow(radius: 2)
-                        .rotationEffect(.degrees(isLoading ? 360 : 0))
-                        .animation(isLoading ? .linear(duration: 1).repeatForever(autoreverses: false) : .default, value: isLoading)
+                        .disabled(isLoading)
                     }
-                    .disabled(isLoading)
                 }
             }
             .padding(.horizontal, 20)
