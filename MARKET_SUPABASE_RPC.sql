@@ -40,20 +40,35 @@ RETURNS TABLE (
 ) AS $$
 BEGIN
     RETURN QUERY
+    WITH all_users AS (
+        -- 获取所有用户（包括没有asset的用户）
+        SELECT DISTINCT username FROM asset_checkins
+        UNION
+        SELECT DISTINCT from_user AS username FROM transfer_requests WHERE status = 'completed'
+        UNION
+        SELECT DISTINCT to_user AS username FROM transfer_requests WHERE status = 'completed'
+        UNION
+        SELECT DISTINCT bidder_username AS username FROM bids WHERE status = 'completed'
+        UNION
+        SELECT DISTINCT owner_username AS username FROM bids WHERE status = 'completed'
+    )
     SELECT 
-        ac.username,
-        COUNT(*) as total_records,
-        COUNT(DISTINCT ac.building_id) as unique_buildings,
+        au.username,
+        COALESCE((SELECT COUNT(*) FROM asset_checkins ac WHERE ac.username = au.username), 0) as total_records,
+        COALESCE((SELECT COUNT(DISTINCT building_id) FROM asset_checkins ac WHERE ac.username = au.username), 0) as unique_buildings,
         COALESCE(
-            (SELECT COUNT(*) 
-             FROM transfer_requests tr 
-             WHERE tr.from_user = ac.username 
-             AND tr.status = 'completed'
-            ), 0
+            (SELECT COUNT(*) FROM transfer_requests tr WHERE tr.from_user = au.username AND tr.status = 'completed'), 0
+        ) + COALESCE(
+            (SELECT COUNT(*) FROM bids b WHERE b.owner_username = au.username AND b.status = 'completed'), 0
         ) as transfer_count,
-        (COUNT(*) * 10 + COUNT(DISTINCT ac.building_id) * 50)::BIGINT as activity_score
-    FROM asset_checkins ac
-    GROUP BY ac.username
+        (
+            COALESCE((SELECT COUNT(*) FROM asset_checkins ac WHERE ac.username = au.username), 0) * 10 + 
+            COALESCE((SELECT COUNT(DISTINCT building_id) FROM asset_checkins ac WHERE ac.username = au.username), 0) * 50 +
+            COALESCE((SELECT COUNT(*) FROM transfer_requests tr WHERE tr.from_user = au.username AND tr.status = 'completed'), 0) * 20 +
+            COALESCE((SELECT COUNT(*) FROM bids b WHERE b.owner_username = au.username AND b.status = 'completed'), 0) * 20
+        )::BIGINT as activity_score
+    FROM all_users au
+    WHERE au.username IS NOT NULL AND au.username != ''
     ORDER BY activity_score DESC
     LIMIT user_limit;
 END;

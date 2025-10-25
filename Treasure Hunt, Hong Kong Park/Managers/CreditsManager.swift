@@ -108,8 +108,26 @@ class CreditsManager {
         to sellerUsername: String,
         reason: String = "Asset trade"
     ) throws {
-        // 先检查买家余额
-        try deductCredits(amount, for: buyerUsername, reason: "Payment: \(reason)")
+        let currentCredits = getCredits(for: buyerUsername)
+        let frozenCredits = getFrozenCredits(for: buyerUsername)
+        
+        Logger.debug("💰 Transfer attempt: \(amount) credits from @\(buyerUsername)")
+        Logger.debug("   Current total: \(currentCredits), Frozen: \(frozenCredits), Available: \(currentCredits - frozenCredits)")
+        
+        // 检查总余额（包括frozen部分）是否足够
+        // 注意：对于Bid交易，我们允许使用frozen credits
+        guard currentCredits >= amount else {
+            Logger.error("❌ Insufficient total credits for @\(buyerUsername): has \(currentCredits), needs \(amount)")
+            throw NSError(domain: "CreditsManager", code: -1, userInfo: [
+                NSLocalizedDescriptionKey: "Insufficient credits. You have \(currentCredits) credits but need \(amount)."
+            ])
+        }
+        
+        // 扣除买家Credits
+        let newBuyerCredits = currentCredits - amount
+        setCredits(newBuyerCredits, for: buyerUsername)
+        Logger.success("💰 -\(amount) credits for @\(buyerUsername) (Payment: \(reason))")
+        Logger.debug("   Total: \(currentCredits) → \(newBuyerCredits)")
         
         // 给卖家增加
         addCredits(amount, for: sellerUsername, reason: "Sale: \(reason)")

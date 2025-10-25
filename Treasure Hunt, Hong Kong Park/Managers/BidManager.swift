@@ -272,19 +272,21 @@ class BidManager {
             Logger.debug("🔄 Both parties accepted, transferring asset...")
             try await transferAssetOwnership(bid: bidData)
             
-            // 解冻原始出价金额
-            CreditsManager.shared.unfreezeCredits(bidData.bidAmount, for: bidData.bidderUsername)
-            
             // 转移Credits（买家支付给卖家）
             let finalAmount = bidData.counterAmount ?? bidData.bidAmount
             Logger.debug("💸 Transferring \(finalAmount) credits from @\(bidData.bidderUsername) to @\(bidData.ownerUsername)")
             
+            // 重要：先执行Credits转账（deductCredits会检查总余额，包括frozen部分）
+            // 然后再解冻，避免余额不足错误
             try CreditsManager.shared.transferCredits(
                 amount: finalAmount,
                 from: bidData.bidderUsername,
                 to: bidData.ownerUsername,
                 reason: "Asset \(bidData.recordId)"
             )
+            
+            // 转账成功后，解冻原始出价金额（因为已经扣除了finalAmount）
+            CreditsManager.shared.unfreezeCredits(bidData.bidAmount, for: bidData.bidderUsername)
             
             Logger.success("💰 Credits transfer completed!")
             
