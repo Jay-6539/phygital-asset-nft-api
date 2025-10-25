@@ -58,7 +58,7 @@ struct MarketView: View {
                 
                 HStack(spacing: 12) {
                     // Bid通知按钮
-                    if let username = currentUsername {
+                    if currentUsername != nil {
                         BidNotificationButton(
                             unreadCount: unreadBidCount,
                             appGreen: appGreen,
