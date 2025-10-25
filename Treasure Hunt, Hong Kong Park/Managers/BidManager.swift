@@ -264,6 +264,35 @@ class BidManager {
         Logger.debug("   - From: '\(bid.ownerUsername)'")
         Logger.debug("   - To: '\(bid.bidderUsername)'")
         
+        // 首先查询记录是否存在
+        let tableName = bid.recordType == "building" ? "asset_checkins" : "oval_office_checkins"
+        let queryUrl = URL(string: "\(SupabaseConfig.url)/rest/v1/\(tableName)?id=eq.\(bid.recordId.uuidString.lowercased())&select=id,username,asset_name")!
+        
+        Logger.debug("🔍 Verifying record exists...")
+        Logger.debug("   Query: \(queryUrl.absoluteString)")
+        
+        let queryData = try await NetworkManager.shared.request(
+            url: queryUrl,
+            method: "GET",
+            headers: [
+                "apikey": SupabaseConfig.anonKey,
+                "Authorization": "Bearer \(SupabaseConfig.anonKey)"
+            ],
+            timeout: 30,
+            retries: 3
+        )
+        
+        if let queryString = String(data: queryData, encoding: .utf8) {
+            Logger.debug("   Query result: \(queryString)")
+            
+            if queryString == "[]" {
+                Logger.error("❌ Record not found in database!")
+                throw NSError(domain: "BidManager", code: -2, userInfo: [
+                    NSLocalizedDescriptionKey: "Asset record not found. It may have been deleted."
+                ])
+            }
+        }
+        
         let updateData: [String: Any] = [
             "username": bid.bidderUsername,
             "updated_at": ISO8601DateFormatter().string(from: Date())
@@ -273,12 +302,18 @@ class BidManager {
         
         // 根据record_type更新对应的表
         let tableName = bid.recordType == "building" ? "asset_checkins" : "oval_office_checkins"
-        let endpoint = "\(tableName)?id=eq.\(bid.recordId.uuidString)"
+        
+        // 尝试不同的查询格式
+        let recordIdString = bid.recordId.uuidString.uppercased()
         
         Logger.debug("📤 Updating table: \(tableName)")
-        Logger.debug("📤 Endpoint: \(endpoint)")
+        Logger.debug("📤 Record ID (UUID): \(recordIdString)")
         
-        let responseData = try await NetworkManager.shared.request(
+        // 首先尝试直接使用UUID字符串查询
+        var endpoint = "\(tableName)?id=eq.\(recordIdString)"
+        Logger.debug("📤 Endpoint attempt 1: \(endpoint)")
+        
+        var responseData = try await NetworkManager.shared.request(
             url: URL(string: "\(SupabaseConfig.url)/rest/v1/\(endpoint)")!,
             method: "PATCH",
             headers: [
@@ -292,13 +327,52 @@ class BidManager {
             retries: 3
         )
         
-        // 解析响应以确认更新
-        if let responseString = String(data: responseData, encoding: .utf8) {
-            Logger.debug("📥 Update response: \(responseString)")
+        // 检查返回是否为空
+        if let responseString = String(data: responseData, encoding: .utf8), responseString == "[]" {
+            Logger.warning("⚠️ First attempt returned empty, trying lowercase UUID...")
+            
+            // 尝试小写UUID
+            endpoint = "\(tableName)?id=eq.\(bid.recordId.uuidString.lowercased())"
+            Logger.debug("📤 Endpoint attempt 2: \(endpoint)")
+            
+            responseData = try await NetworkManager.shared.request(
+                url: URL(string: "\(SupabaseConfig.url)/rest/v1/\(endpoint)")!,
+                method: "PATCH",
+                headers: [
+                    "apikey": SupabaseConfig.anonKey,
+                    "Authorization": "Bearer \(SupabaseConfig.anonKey)",
+                    "Content-Type": "application/json",
+                    "Prefer": "return=representation"
+                ],
+                body: jsonData,
+                timeout: 30,
+                retries: 3
+            )
         }
         
-        Logger.success("✅ Asset ownership transferred to '\(bid.bidderUsername)'")
-        Logger.success("✅ Record \(bid.recordId) now belongs to '\(bid.bidderUsername)'")
+        // 解析响应以确认更新
+        if let responseString = String(data: responseData, encoding: .utf8) {
+            Logger.debug("📥 Final update response: \(responseString)")
+            
+            // 检查是否成功更新
+            if responseString == "[]" {
+                Logger.error("❌ Asset update failed - record not found!")
+                Logger.error("   Tried record_id: \(bid.recordId)")
+                Logger.error("   Table: \(tableName)")
+                
+                // 尝试查询记录是否存在
+                Logger.debug("🔍 Attempting to query record directly...")
+                let queryEndpoint = "\(tableName)?select=id,username&id=eq.\(bid.recordId.uuidString.lowercased())"
+                Logger.debug("🔍 Query: \(queryEndpoint)")
+                
+                throw NSError(domain: "BidManager", code: -1, userInfo: [
+                    NSLocalizedDescriptionKey: "Asset record not found. The record may have been deleted."
+                ])
+            } else {
+                Logger.success("✅ Asset ownership transferred to '\(bid.bidderUsername)'")
+                Logger.success("✅ Record \(bid.recordId) now belongs to '\(bid.bidderUsername)'")
+            }
+        }
     }
     
     // MARK: - 拒绝Bid
