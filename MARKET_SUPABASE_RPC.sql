@@ -89,7 +89,7 @@ $$ LANGUAGE plpgsql;
 -- ============================================================================
 CREATE OR REPLACE FUNCTION get_most_traded_records(record_limit INT DEFAULT 20)
 RETURNS TABLE (
-    id TEXT,
+    id UUID,
     building_id TEXT,
     building_name TEXT,
     image_url TEXT,
@@ -109,7 +109,7 @@ BEGIN
         COALESCE(
             (SELECT COUNT(*) 
              FROM transfer_requests tr 
-             WHERE tr.record_id = ac.id 
+             WHERE tr.record_id::text = ac.id::text
              AND tr.record_type = 'building'
              AND tr.status = 'completed'
             ), 0
@@ -117,7 +117,7 @@ BEGIN
         ac.created_at,
         ac.notes
     FROM asset_checkins ac
-    WHERE ac.id IN (
+    WHERE ac.id::text IN (
         -- 只选择有转账记录的check-ins
         SELECT DISTINCT record_id 
         FROM transfer_requests 
