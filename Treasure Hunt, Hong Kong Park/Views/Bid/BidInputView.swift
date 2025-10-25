@@ -215,8 +215,8 @@ struct BidInputView: View {
             Text(errorMessage)
         }
         .onAppear {
-            // 加载用户Credits余额
-            availableCredits = CreditsManager.shared.getCredits(for: currentUsername)
+            // 加载用户可用Credits余额（总额 - 冻结）
+            availableCredits = CreditsManager.shared.getAvailableCredits(for: currentUsername)
             Logger.debug("💰 Available credits for bid: \(availableCredits)")
         }
     }

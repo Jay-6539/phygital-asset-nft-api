@@ -86,6 +86,9 @@ class BidManager {
         Logger.debug("📋 Bidder: '\(bid.bidderUsername)' | Owner: '\(bid.ownerUsername)'")
         Logger.debug("📋 Amount: \(bid.bidAmount) | Status: \(bid.status.rawValue)")
         
+        // 冻结出价金额
+        CreditsManager.shared.freezeCredits(bid.bidAmount, for: bidderUsername)
+        
         return bid
     }
     
@@ -268,6 +271,9 @@ class BidManager {
         if shouldComplete {
             Logger.debug("🔄 Both parties accepted, transferring asset...")
             try await transferAssetOwnership(bid: bidData)
+            
+            // 解冻原始出价金额
+            CreditsManager.shared.unfreezeCredits(bidData.bidAmount, for: bidData.bidderUsername)
             
             // 转移Credits（买家支付给卖家）
             let finalAmount = bidData.counterAmount ?? bidData.bidAmount
@@ -498,8 +504,9 @@ class BidManager {
         
         Logger.success("✅ Rejected \(otherBids.count) other bids for this asset")
         
-        // 记录被拒绝的Bid
+        // 解冻被拒绝的Bid的Credits
         for bid in otherBids {
+            CreditsManager.shared.unfreezeCredits(bid.bidAmount, for: bid.bidderUsername)
             Logger.debug("   ❌ Rejected bid from @\(bid.bidderUsername) (\(bid.bidAmount) credits)")
         }
     }
@@ -538,12 +545,18 @@ class BidManager {
             retries: 3
         )
         
+        // 解冻Credits
+        CreditsManager.shared.unfreezeCredits(bidData.bidAmount, for: bidData.bidderUsername)
+        
         Logger.success("✅ Bid cancelled successfully")
     }
     
     // MARK: - 拒绝Bid
     func rejectBid(bidId: UUID, message: String?) async throws {
         Logger.debug("❌ Rejecting bid: \(bidId)")
+        
+        // 先查询bid详情以获取金额
+        let bidData = try await getBidDetail(bidId: bidId)
         
         let updateData: [String: Any] = [
             "status": "rejected",
@@ -565,6 +578,9 @@ class BidManager {
             timeout: 30,
             retries: 3
         )
+        
+        // 解冻买家的Credits
+        CreditsManager.shared.unfreezeCredits(bidData.bidAmount, for: bidData.bidderUsername)
         
         Logger.success("✅ Bid rejected")
     }

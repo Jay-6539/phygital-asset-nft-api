@@ -13,6 +13,44 @@ class CreditsManager {
     
     private let userDefaults = UserDefaults.standard
     private let creditsKey = "user_credits_"
+    private let frozenCreditsKey = "user_frozen_credits_"
+    
+    // MARK: - 获取冻结的Credits
+    func getFrozenCredits(for username: String) -> Int {
+        let key = frozenCreditsKey + username
+        return userDefaults.integer(forKey: key)
+    }
+    
+    // MARK: - 获取可用的Credits（总额 - 冻结）
+    func getAvailableCredits(for username: String) -> Int {
+        let total = getCredits(for: username)
+        let frozen = getFrozenCredits(for: username)
+        let available = total - frozen
+        Logger.debug("💰 Available credits for @\(username): \(available) (total: \(total), frozen: \(frozen))")
+        return max(0, available)
+    }
+    
+    // MARK: - 冻结Credits（出价时）
+    func freezeCredits(_ amount: Int, for username: String) {
+        let currentFrozen = getFrozenCredits(for: username)
+        let newFrozen = currentFrozen + amount
+        let key = frozenCreditsKey + username
+        userDefaults.set(newFrozen, forKey: key)
+        
+        Logger.debug("🧊 Frozen \(amount) credits for @\(username)")
+        Logger.debug("   Frozen total: \(currentFrozen) → \(newFrozen)")
+    }
+    
+    // MARK: - 解冻Credits（Bid取消/完成/拒绝时）
+    func unfreezeCredits(_ amount: Int, for username: String) {
+        let currentFrozen = getFrozenCredits(for: username)
+        let newFrozen = max(0, currentFrozen - amount)
+        let key = frozenCreditsKey + username
+        userDefaults.set(newFrozen, forKey: key)
+        
+        Logger.debug("🔓 Unfrozen \(amount) credits for @\(username)")
+        Logger.debug("   Frozen total: \(currentFrozen) → \(newFrozen)")
+    }
     
     // MARK: - 获取Credits
     func getCredits(for username: String) -> Int {

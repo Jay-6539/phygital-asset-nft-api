@@ -240,14 +240,9 @@ struct OvalOfficeCheckInDetailView: View {
                                 Logger.debug("🎯 Bid button tapped")
                                 showBidInput = true
                             }) {
-                                HStack(spacing: 12) {
-                                    Image(systemName: "dollarsign.circle.fill")
-                                        .font(.system(size: 16))
-                                    
-                                    Text("Bid")
-                                        .font(.headline)
-                                }
-                                .foregroundColor(appGreen)
+                                Text("Bid")
+                                    .font(.headline)
+                                    .foregroundColor(appGreen)
                                 .frame(maxWidth: .infinity)
                                 .padding()
                                 .background {
