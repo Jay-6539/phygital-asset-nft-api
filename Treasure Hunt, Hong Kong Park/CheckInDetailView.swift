@@ -236,24 +236,54 @@ struct CheckInDetailView: View {
                             .disabled(isCreatingTransfer)
                         }
                         
-                        // Bid按钮
-                        Button(action: {
-                            Logger.debug("🎯 Bid button tapped (功能待实现)")
-                            // TODO: 实现Bid功能
-                        }) {
-                            HStack(spacing: 12) {
-                                Image(systemName: "gavel.fill")
-                                    .font(.system(size: 16))
-                                
-                                Text("Bid")
-                                    .font(.headline)
+                        // Bid按钮（只在非拥有者时显示）
+                        if currentUsername != checkIn.username {
+                            Button(action: {
+                                Logger.debug("🎯 Bid button tapped (功能待实现)")
+                                // TODO: 实现Bid功能
+                            }) {
+                                HStack(spacing: 12) {
+                                    Image(systemName: "gavel.fill")
+                                        .font(.system(size: 16))
+                                    
+                                    Text("Bid")
+                                        .font(.headline)
+                                }
+                                .foregroundColor(appGreen)
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background {
+                                    ZStack {
+                                        Color.clear.background(.ultraThinMaterial)
+                                        LinearGradient(
+                                            gradient: Gradient(colors: [
+                                                appGreen.opacity(0.15),
+                                                appGreen.opacity(0.05)
+                                            ]),
+                                            startPoint: .top,
+                                            endPoint: .bottom
+                                        )
+                                    }
+                                }
+                                .cornerRadius(12)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .strokeBorder(
+                                            LinearGradient(
+                                                gradient: Gradient(stops: [
+                                                    .init(color: Color.white.opacity(0.6), location: 0.0),
+                                                    .init(color: Color.white.opacity(0.0), location: 0.3),
+                                                    .init(color: appGreen.opacity(0.2), location: 0.7),
+                                                    .init(color: appGreen.opacity(0.4), location: 1.0)
+                                                ]),
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            ),
+                                            lineWidth: 1.5
+                                        )
+                                )
+                                .shadow(color: appGreen.opacity(0.2), radius: 4, x: 0, y: 2)
                             }
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(appGreen)
-                            .cornerRadius(12)
-                            .shadow(color: appGreen.opacity(0.3), radius: 4, x: 0, y: 2)
                         }
                     }
                     .padding(20)
