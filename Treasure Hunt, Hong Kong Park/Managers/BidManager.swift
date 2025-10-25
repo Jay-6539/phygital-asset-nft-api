@@ -181,14 +181,21 @@ class BidManager {
     
     // MARK: - 接受Bid（买家或卖家）
     func acceptBid(bidId: UUID, contactInfo: String, isBidder: Bool) async throws {
-        Logger.debug("✅ Accepting bid: \(bidId)")
+        Logger.debug("✅ Accepting bid: \(bidId), isBidder: \(isBidder)")
         
         // 先查询bid详情以获取record信息
         let bidData = try await getBidDetail(bidId: bidId)
         
-        // 1. 更新bid状态（如果双方都提供了联系方式，标记为completed并转移资产）
-        let shouldComplete = isBidder ? (bidData.ownerContact != nil) : (bidData.bidderContact != nil)
+        Logger.debug("📋 Current bid status:")
+        Logger.debug("   - Owner contact: \(bidData.ownerContact ?? "nil")")
+        Logger.debug("   - Bidder contact: \(bidData.bidderContact ?? "nil")")
+        
+        // 1. 检查对方是否已经提供联系方式
+        let otherPartyHasContact = isBidder ? (bidData.ownerContact != nil && !bidData.ownerContact!.isEmpty) : (bidData.bidderContact != nil && !bidData.bidderContact!.isEmpty)
+        let shouldComplete = otherPartyHasContact
         let newStatus = shouldComplete ? "completed" : "accepted"
+        
+        Logger.debug("🔍 Should complete: \(shouldComplete) (other party has contact: \(otherPartyHasContact))")
         
         let updateData: [String: Any] = [
             isBidder ? "bidder_contact" : "owner_contact": contactInfo,
@@ -212,11 +219,15 @@ class BidManager {
             retries: 3
         )
         
-        Logger.success("✅ Bid \(newStatus), contact info exchanged")
+        Logger.success("✅ Bid updated to \(newStatus), contact info exchanged")
         
         // 2. 如果双方都接受了（completed），转移资产所有权
         if shouldComplete {
+            Logger.debug("🔄 Both parties accepted, transferring asset...")
             try await transferAssetOwnership(bid: bidData)
+            Logger.success("✅ Asset transfer completed!")
+        } else {
+            Logger.debug("⏳ Waiting for other party to accept")
         }
     }
     
@@ -247,7 +258,11 @@ class BidManager {
     
     // MARK: - 转移资产所有权
     private func transferAssetOwnership(bid: Bid) async throws {
-        Logger.debug("🔄 Transferring asset ownership from '\(bid.ownerUsername)' to '\(bid.bidderUsername)'")
+        Logger.debug("🔄 Starting asset ownership transfer...")
+        Logger.debug("   - Record ID: \(bid.recordId)")
+        Logger.debug("   - Record Type: \(bid.recordType)")
+        Logger.debug("   - From: '\(bid.ownerUsername)'")
+        Logger.debug("   - To: '\(bid.bidderUsername)'")
         
         let updateData: [String: Any] = [
             "username": bid.bidderUsername,
@@ -258,21 +273,32 @@ class BidManager {
         
         // 根据record_type更新对应的表
         let tableName = bid.recordType == "building" ? "asset_checkins" : "oval_office_checkins"
+        let endpoint = "\(tableName)?id=eq.\(bid.recordId.uuidString)"
         
-        _ = try await NetworkManager.shared.request(
-            url: URL(string: "\(SupabaseConfig.url)/rest/v1/\(tableName)?id=eq.\(bid.recordId.uuidString)")!,
+        Logger.debug("📤 Updating table: \(tableName)")
+        Logger.debug("📤 Endpoint: \(endpoint)")
+        
+        let responseData = try await NetworkManager.shared.request(
+            url: URL(string: "\(SupabaseConfig.url)/rest/v1/\(endpoint)")!,
             method: "PATCH",
             headers: [
                 "apikey": SupabaseConfig.anonKey,
                 "Authorization": "Bearer \(SupabaseConfig.anonKey)",
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
+                "Prefer": "return=representation"
             ],
             body: jsonData,
             timeout: 30,
             retries: 3
         )
         
+        // 解析响应以确认更新
+        if let responseString = String(data: responseData, encoding: .utf8) {
+            Logger.debug("📥 Update response: \(responseString)")
+        }
+        
         Logger.success("✅ Asset ownership transferred to '\(bid.bidderUsername)'")
+        Logger.success("✅ Record \(bid.recordId) now belongs to '\(bid.bidderUsername)'")
     }
     
     // MARK: - 拒绝Bid
