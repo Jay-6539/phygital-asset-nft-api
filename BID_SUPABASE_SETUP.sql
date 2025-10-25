@@ -53,8 +53,13 @@ CREATE INDEX IF NOT EXISTS idx_bids_created ON bids(created_at DESC);
 -- ============================================================================
 ALTER TABLE bids ENABLE ROW LEVEL SECURITY;
 
--- 4. 创建RLS策略
+-- 4. 创建RLS策略（先删除旧策略，避免重复创建错误）
 -- ============================================================================
+-- 删除已存在的策略
+DROP POLICY IF EXISTS "Users can view related bids" ON bids;
+DROP POLICY IF EXISTS "Users can create bids" ON bids;
+DROP POLICY IF EXISTS "Users can update related bids" ON bids;
+
 -- 用户可以查看与自己相关的Bid
 CREATE POLICY "Users can view related bids"
     ON bids FOR SELECT
@@ -80,6 +85,9 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- 删除已存在的触发器
+DROP TRIGGER IF EXISTS trigger_update_bids_updated_at ON bids;
+
 CREATE TRIGGER trigger_update_bids_updated_at
     BEFORE UPDATE ON bids
     FOR EACH ROW
@@ -87,6 +95,8 @@ CREATE TRIGGER trigger_update_bids_updated_at
 
 -- 6. 创建RPC函数：获取未读Bid数量
 -- ============================================================================
+DROP FUNCTION IF EXISTS get_unread_bid_count(TEXT);
+
 CREATE OR REPLACE FUNCTION get_unread_bid_count(username_param TEXT)
 RETURNS INTEGER AS $$
 BEGIN
@@ -105,6 +115,8 @@ GRANT EXECUTE ON FUNCTION get_unread_bid_count(TEXT) TO anon, authenticated;
 
 -- 7. 创建RPC函数：获取我收到的Bid
 -- ============================================================================
+DROP FUNCTION IF EXISTS get_my_received_bids(TEXT);
+
 CREATE OR REPLACE FUNCTION get_my_received_bids(username_param TEXT)
 RETURNS TABLE (
     id UUID,
