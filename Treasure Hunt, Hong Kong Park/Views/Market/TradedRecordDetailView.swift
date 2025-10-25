@@ -168,16 +168,16 @@ struct TradedRecordDetailView: View {
                             }
                         }
                     }
-                    .padding(20)
+                    .padding(16)
                 }
             }
-            .frame(maxWidth: 550)
+            .frame(maxWidth: 450)
             .frame(maxHeight: .infinity)
             .background(Color(.systemBackground))
-            .cornerRadius(20)
+            .cornerRadius(16)
             .shadow(radius: 20)
-            .padding(.horizontal, 30)
-            .padding(.vertical, 50)
+            .padding(.horizontal, 24)
+            .padding(.vertical, 40)
             
             // Bid Input界面
             if showBidInput {
