@@ -141,6 +141,36 @@ struct BidManagementView: View {
                 .transition(.opacity)
             }
         }
+        .onAppear {
+            // 页面出现时预加载两个Tab的未读数量
+            Task {
+                await loadBothTabCounts()
+            }
+        }
+    }
+    
+    // MARK: - 预加载两个Tab的未读数量
+    private func loadBothTabCounts() async {
+        do {
+            // 并发加载两边的数据
+            async let receivedBids = BidManager.shared.getReceivedBids(ownerUsername: currentUsername)
+            async let sentBids = BidManager.shared.getSentBids(bidderUsername: currentUsername)
+            
+            let (received, sent) = try await (receivedBids, sentBids)
+            
+            // 计算未读数量
+            let receivedUnread = received.filter { $0.status == .pending }.count
+            let sentUnread = sent.filter { $0.status == .countered || $0.status == .accepted }.count
+            
+            await MainActor.run {
+                self.unreadReceivedCount = receivedUnread
+                self.unreadOffersCount = sentUnread
+            }
+            
+            Logger.debug("🔔 Preloaded counts - Received: \(receivedUnread), Offers: \(sentUnread)")
+        } catch {
+            Logger.error("❌ Failed to preload bid counts: \(error)")
+        }
     }
 }
 
