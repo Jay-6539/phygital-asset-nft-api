@@ -5419,6 +5419,22 @@ struct ContentView: View {
                     }
                 )
             }
+            .onAppear {
+                // 加载未读Bid数量
+                if let currentUsername = username {
+                    Task {
+                        do {
+                            let count = try await BidManager.shared.getUnreadBidCount(ownerUsername: currentUsername)
+                            await MainActor.run {
+                                self.unreadBidCount = count
+                            }
+                            Logger.debug("🔔 Initial unread bid count loaded: \(count)")
+                        } catch {
+                            Logger.error("❌ Failed to load initial bid count: \(error.localizedDescription)")
+                        }
+                    }
+                }
+            }
     }
 }
 
