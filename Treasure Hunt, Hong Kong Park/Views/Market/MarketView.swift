@@ -25,6 +25,7 @@ struct MarketView: View {
     @State private var selectedBuilding: BuildingWithStats? // 选中的建筑，显示历史记录
     @State private var showBidList = false
     @State private var unreadBidCount = 0
+    @State private var userCredits = 0
     
     var body: some View {
         VStack(spacing: 0) {
@@ -108,15 +109,40 @@ struct MarketView: View {
             Divider()
             
             // MARK: - Tab切换区
-            HStack(spacing: 0) {
-                ForEach(MarketTab.allCases, id: \.self) { tab in
-                    MarketTabButton(
-                        tab: tab,
-                        isSelected: selectedTab == tab,
-                        appGreen: appGreen
-                    ) {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            selectedTab = tab
+            HStack(spacing: 12) {
+                // Credits显示
+                HStack(spacing: 6) {
+                    Image(systemName: "star.fill")
+                        .font(.system(size: 14))
+                        .foregroundColor(appGreen)
+                    
+                    Text("\(userCredits)")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundColor(appGreen)
+                    
+                    Text("Credits")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(appGreen.opacity(0.1))
+                .cornerRadius(10)
+                
+                Spacer()
+                
+                // Tab按钮（缩小）
+                HStack(spacing: 4) {
+                    ForEach(MarketTab.allCases, id: \.self) { tab in
+                        MarketTabButton(
+                            tab: tab,
+                            isSelected: selectedTab == tab,
+                            appGreen: appGreen,
+                            compact: true
+                        ) {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                selectedTab = tab
+                            }
                         }
                     }
                 }
@@ -214,6 +240,7 @@ struct MarketView: View {
             Task {
                 await loadMarketData()
                 await loadUnreadBidCount()
+                await loadUserCredits()
             }
         }
         // Building History overlay
@@ -244,6 +271,16 @@ struct MarketView: View {
                 )
             }
         }
+    }
+    
+    // MARK: - 加载用户Credits
+    private func loadUserCredits() async {
+        // TODO: 从Supabase获取用户真实Credits
+        // 目前先设置为固定值，后续可以从users表查询
+        await MainActor.run {
+            self.userCredits = 0 // 默认0，后续实现真实Credits系统
+        }
+        Logger.debug("💰 User credits: \(userCredits)")
     }
     
     // MARK: - 加载未读Bid数量
@@ -337,26 +374,48 @@ struct MarketTabButton: View {
     let tab: MarketTab
     let isSelected: Bool
     let appGreen: Color
+    var compact: Bool = false
     let action: () -> Void
     
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 4) {
-                Image(systemName: tab.icon)
-                    .font(.system(size: 16))
-                    .foregroundColor(isSelected ? appGreen : .gray)
-                
-                Text(tab.rawValue)
-                    .font(.caption)
-                    .fontWeight(isSelected ? .semibold : .regular)
-                    .foregroundColor(isSelected ? appGreen : .gray)
+            if compact {
+                // 紧凑模式：只显示图标
+                VStack(spacing: 2) {
+                    Image(systemName: tab.icon)
+                        .font(.system(size: 14))
+                        .foregroundColor(isSelected ? appGreen : .gray)
+                    
+                    Text(tab.rawValue)
+                        .font(.system(size: 9))
+                        .fontWeight(isSelected ? .semibold : .regular)
+                        .foregroundColor(isSelected ? appGreen : .gray)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
+                .background(
+                    isSelected ? appGreen.opacity(0.15) : Color.clear
+                )
+                .cornerRadius(8)
+            } else {
+                // 正常模式
+                VStack(spacing: 4) {
+                    Image(systemName: tab.icon)
+                        .font(.system(size: 16))
+                        .foregroundColor(isSelected ? appGreen : .gray)
+                    
+                    Text(tab.rawValue)
+                        .font(.caption)
+                        .fontWeight(isSelected ? .semibold : .regular)
+                        .foregroundColor(isSelected ? appGreen : .gray)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .background(
+                    isSelected ? appGreen.opacity(0.1) : Color.clear
+                )
+                .cornerRadius(8)
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
-            .background(
-                isSelected ? appGreen.opacity(0.1) : Color.clear
-            )
-            .cornerRadius(8)
         }
     }
 }
