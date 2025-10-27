@@ -8,6 +8,49 @@
 import Foundation
 import UIKit
 
+// MARK: - Date Decoding Extension
+extension JSONDecoder {
+    static func supabaseDecoder() -> JSONDecoder {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            let dateString = try container.decode(String.self)
+            
+            // 尝试多种日期格式
+            let formatters = [
+                // Supabase格式：2025-10-27T09:55:23.349771+00:00
+                ISO8601DateFormatter().also { $0.formatOptions = [.withInternetDateTime, .withFractionalSeconds] },
+                // 标准ISO8601格式
+                ISO8601DateFormatter().also { $0.formatOptions = [.withInternetDateTime] },
+                // 简单格式
+                ISO8601DateFormatter().also { $0.formatOptions = [.withDate, .withTime] }
+            ]
+            
+            for formatter in formatters {
+                if let date = formatter.date(from: dateString) {
+                    return date
+                }
+            }
+            
+            // 如果所有格式都失败，抛出错误
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(
+                    codingPath: decoder.codingPath,
+                    debugDescription: "Expected date string to be ISO8601-formatted, but got: \(dateString)"
+                )
+            )
+        }
+        return decoder
+    }
+}
+
+extension ISO8601DateFormatter {
+    func also(_ configure: (ISO8601DateFormatter) -> Void) -> ISO8601DateFormatter {
+        configure(self)
+        return self
+    }
+}
+
 /// 历史建筑的 Check-in 记录
 struct BuildingCheckIn: Codable, Identifiable {
     let id: UUID
@@ -146,8 +189,7 @@ class BuildingCheckInManager: ObservableObject {
                 }
             }
             
-            let decoder = JSONDecoder()
-            decoder.dateDecodingStrategy = .iso8601
+            let decoder = JSONDecoder.supabaseDecoder()
             let savedCheckIns = try decoder.decode([BuildingCheckIn].self, from: data)
             
             guard let savedCheckIn = savedCheckIns.first else {
@@ -216,8 +258,7 @@ class BuildingCheckInManager: ObservableObject {
                 }
             }
             
-            let decoder = JSONDecoder()
-            decoder.dateDecodingStrategy = .iso8601
+            let decoder = JSONDecoder.supabaseDecoder()
             let checkIns = try decoder.decode([BuildingCheckIn].self, from: data)
             Logger.success("Fetched \(checkIns.count) check-ins for building: \(buildingId)")
             
@@ -249,8 +290,7 @@ class BuildingCheckInManager: ObservableObject {
                          userInfo: [NSLocalizedDescriptionKey: "Failed to fetch check-ins"])
         }
         
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = JSONDecoder.supabaseDecoder()
         let checkIns = try decoder.decode([BuildingCheckIn].self, from: data)
         Logger.success("Fetched \(checkIns.count) recent check-ins")
         
@@ -323,8 +363,7 @@ class BuildingCheckInManager: ObservableObject {
                          userInfo: [NSLocalizedDescriptionKey: "Failed to fetch check-ins by NFC"])
         }
         
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = JSONDecoder.supabaseDecoder()
         let checkIns = try decoder.decode([BuildingCheckIn].self, from: data)
         Logger.success("✅ 成功获取 \(checkIns.count) 条NFC历史记录")
         
@@ -361,8 +400,7 @@ class BuildingCheckInManager: ObservableObject {
                          userInfo: [NSLocalizedDescriptionKey: "Failed to fetch first check-in by NFC"])
         }
         
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = JSONDecoder.supabaseDecoder()
         let checkIns = try decoder.decode([BuildingCheckIn].self, from: data)
         
         if let firstCheckIn = checkIns.first {
@@ -404,8 +442,7 @@ class BuildingCheckInManager: ObservableObject {
                 }
             }
             
-            let decoder = JSONDecoder()
-            decoder.dateDecodingStrategy = .iso8601
+            let decoder = JSONDecoder.supabaseDecoder()
             let checkIns = try decoder.decode([BuildingCheckIn].self, from: data)
             Logger.success("Fetched \(checkIns.count) check-ins for user: \(username)")
             

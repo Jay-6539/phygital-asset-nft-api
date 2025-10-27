@@ -7,6 +7,49 @@
 
 import SwiftUI
 
+// MARK: - Date Decoding Extension
+extension JSONDecoder {
+    static func supabaseDecoder() -> JSONDecoder {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            let dateString = try container.decode(String.self)
+            
+            // 尝试多种日期格式
+            let formatters = [
+                // Supabase格式：2025-10-27T09:55:23.349771+00:00
+                ISO8601DateFormatter().also { $0.formatOptions = [.withInternetDateTime, .withFractionalSeconds] },
+                // 标准ISO8601格式
+                ISO8601DateFormatter().also { $0.formatOptions = [.withInternetDateTime] },
+                // 简单格式
+                ISO8601DateFormatter().also { $0.formatOptions = [.withDate, .withTime] }
+            ]
+            
+            for formatter in formatters {
+                if let date = formatter.date(from: dateString) {
+                    return date
+                }
+            }
+            
+            // 如果所有格式都失败，抛出错误
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(
+                    codingPath: decoder.codingPath,
+                    debugDescription: "Expected date string to be ISO8601-formatted, but got: \(dateString)"
+                )
+            )
+        }
+        return decoder
+    }
+}
+
+extension ISO8601DateFormatter {
+    func also(_ configure: (ISO8601DateFormatter) -> Void) -> ISO8601DateFormatter {
+        configure(self)
+        return self
+    }
+}
+
 struct MyHistoryView: View {
     let username: String
     let appGreen: Color
@@ -317,8 +360,7 @@ struct MyHistoryView: View {
             throw NSError(domain: "FetchFailed", code: -1)
         }
         
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = JSONDecoder.supabaseDecoder()
         return try decoder.decode([BuildingCheckIn].self, from: data)
     }
     
@@ -336,8 +378,7 @@ struct MyHistoryView: View {
             throw NSError(domain: "FetchFailed", code: -1)
         }
         
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = JSONDecoder.supabaseDecoder()
         return try decoder.decode([OvalOfficeCheckIn].self, from: data)
     }
 }
