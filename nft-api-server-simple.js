@@ -86,6 +86,110 @@ app.get('/api/contract-info', (req, res) => {
     });
 });
 
+// 获取用户NFT列表端点
+app.get('/api/user-nfts/:username', async (req, res) => {
+    try {
+        const { username } = req.params;
+        
+        // 模拟用户NFT列表
+        const userNFTs = [
+            {
+                tokenId: `NFT-${Date.now()}-1`,
+                threadId: 'thread-1',
+                buildingId: 'building-1',
+                timestamp: new Date().toISOString(),
+                contractAddress: '0xA0fA27fC547D544528e9BE0cb6569E9B925e533E',
+                owner: username
+            },
+            {
+                tokenId: `NFT-${Date.now()}-2`,
+                threadId: 'thread-2',
+                buildingId: 'building-2',
+                timestamp: new Date().toISOString(),
+                contractAddress: '0xA0fA27fC547D544528e9BE0cb6569E9B925e533E',
+                owner: username
+            }
+        ];
+        
+        res.json({
+            success: true,
+            username: username,
+            nfts: userNFTs,
+            totalCount: userNFTs.length
+        });
+        
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+// 获取NFT详情端点
+app.get('/api/nft/:tokenId', async (req, res) => {
+    try {
+        const { tokenId } = req.params;
+        
+        // 模拟NFT详情
+        const nftDetail = {
+            tokenId: tokenId,
+            threadId: 'thread-1',
+            buildingId: 'building-1',
+            timestamp: new Date().toISOString(),
+            contractAddress: '0xA0fA27fC547D544528e9BE0cb6569E9B925e533E',
+            owner: 'current-user',
+            metadata: {
+                name: 'Phygital Asset Thread',
+                description: 'A unique digital asset representing a physical location',
+                image: 'https://example.com/nft-image.jpg'
+            }
+        };
+        
+        res.json({
+            success: true,
+            nft: nftDetail
+        });
+        
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+// 获取所有NFT列表端点
+app.get('/api/all-nfts', async (req, res) => {
+    try {
+        const { page = 1, limit = 20 } = req.query;
+        
+        // 模拟所有NFT列表
+        const allNFTs = Array.from({ length: parseInt(limit) }, (_, i) => ({
+            tokenId: `NFT-${Date.now()}-${i + 1}`,
+            threadId: `thread-${i + 1}`,
+            buildingId: `building-${i + 1}`,
+            timestamp: new Date().toISOString(),
+            contractAddress: '0xA0fA27fC547D544528e9BE0cb6569E9B925e533E',
+            owner: `user-${(i % 5) + 1}`
+        }));
+        
+        res.json({
+            success: true,
+            nfts: allNFTs,
+            totalCount: allNFTs.length,
+            page: parseInt(page),
+            limit: parseInt(limit)
+        });
+        
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
 // 根路径
 app.get('/', (req, res) => {
     res.json({
@@ -96,7 +200,10 @@ app.get('/', (req, res) => {
             health: 'GET /api/health',
             mint: 'POST /api/mint-thread',
             transfer: 'POST /api/transfer-nft',
-            contract: 'GET /api/contract-info'
+            contract: 'GET /api/contract-info',
+            userNFTs: 'GET /api/user-nfts/:username',
+            nftDetail: 'GET /api/nft/:tokenId',
+            allNFTs: 'GET /api/all-nfts'
         },
         contractAddress: '0xA0fA27fC547D544528e9BE0cb6569E9B925e533E',
         network: 'Amoy Testnet'

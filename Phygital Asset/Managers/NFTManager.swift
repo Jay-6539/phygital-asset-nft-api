@@ -349,6 +349,108 @@ class NFTManager {
         
         return try JSONDecoder().decode(NFTTransferResult.self, from: data)
     }
+    
+    // MARK: - 查询用户NFT
+    /// 获取用户拥有的所有NFT
+    func getUserNFTs(username: String) async -> [NFTInfo]? {
+        guard isNFTEnabled else { return nil }
+        
+        do {
+            let endpoint = "\(apiURL)/user-nfts/\(username)"
+            guard let url = URL(string: endpoint) else { return nil }
+            
+            var request = URLRequest(url: url)
+            request.timeoutInterval = 10
+            
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            guard let httpResponse = response as? HTTPURLResponse,
+                  httpResponse.statusCode == 200 else {
+                return nil
+            }
+            
+            let result = try JSONDecoder().decode(UserNFTsResult.self, from: data)
+            
+            return result.nfts.map { nft in
+                NFTInfo(
+                    threadId: UUID(uuidString: nft.threadId) ?? UUID(),
+                    tokenId: nft.tokenId,
+                    contractAddress: nft.contractAddress,
+                    buildingId: nft.buildingId,
+                    timestamp: nft.timestamp
+                )
+            }
+            
+        } catch {
+            Logger.debug("查询用户NFT失败: \(error)")
+            return nil
+        }
+    }
+    
+    // MARK: - 查询NFT详情
+    /// 获取特定NFT的详细信息
+    func getNFTDetail(tokenId: String) async -> NFTDetail? {
+        guard isNFTEnabled else { return nil }
+        
+        do {
+            let endpoint = "\(apiURL)/nft/\(tokenId)"
+            guard let url = URL(string: endpoint) else { return nil }
+            
+            var request = URLRequest(url: url)
+            request.timeoutInterval = 10
+            
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            guard let httpResponse = response as? HTTPURLResponse,
+                  httpResponse.statusCode == 200 else {
+                return nil
+            }
+            
+            let result = try JSONDecoder().decode(NFTDetailResult.self, from: data)
+            
+            return NFTDetail(
+                tokenId: result.nft.tokenId,
+                threadId: result.nft.threadId,
+                buildingId: result.nft.buildingId,
+                timestamp: result.nft.timestamp,
+                contractAddress: result.nft.contractAddress,
+                owner: result.nft.owner,
+                metadata: result.nft.metadata
+            )
+            
+        } catch {
+            Logger.debug("查询NFT详情失败: \(error)")
+            return nil
+        }
+    }
+    
+    // MARK: - 查询所有NFT
+    /// 获取所有NFT列表（分页）
+    func getAllNFTs(page: Int = 1, limit: Int = 20) async -> AllNFTsResult? {
+        guard isNFTEnabled else { return nil }
+        
+        do {
+            let endpoint = "\(apiURL)/all-nfts?page=\(page)&limit=\(limit)"
+            guard let url = URL(string: endpoint) else { return nil }
+            
+            var request = URLRequest(url: url)
+            request.timeoutInterval = 10
+            
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            guard let httpResponse = response as? HTTPURLResponse,
+                  httpResponse.statusCode == 200 else {
+                return nil
+            }
+            
+            let result = try JSONDecoder().decode(AllNFTsResult.self, from: data)
+            return result
+            
+        } catch {
+            Logger.debug("查询所有NFT失败: \(error)")
+            return nil
+        }
+    }
 }
 
 // MARK: - 数据模型
@@ -391,7 +493,7 @@ struct NFTInfo {
     let timestamp: String?
     
     var polygonscanURL: URL? {
-        // 本地网络没有浏览器，未来切换到测试网时使用
+        // Amoy测试网Polygonscan链接
         URL(string: "https://amoy.polygonscan.com/token/\(contractAddress)?a=\(tokenId)")
     }
     
@@ -399,6 +501,62 @@ struct NFTInfo {
         // OpenSea测试网链接
         URL(string: "https://testnets.opensea.io/assets/amoy/\(contractAddress)/\(tokenId)")
     }
+}
+
+// MARK: - 新增数据模型
+struct UserNFTsResult: Codable {
+    let success: Bool
+    let username: String
+    let nfts: [UserNFT]
+    let totalCount: Int
+}
+
+struct UserNFT: Codable {
+    let tokenId: String
+    let threadId: String
+    let buildingId: String
+    let timestamp: String
+    let contractAddress: String
+    let owner: String
+}
+
+struct NFTDetailResult: Codable {
+    let success: Bool
+    let nft: NFTDetailData
+}
+
+struct NFTDetailData: Codable {
+    let tokenId: String
+    let threadId: String
+    let buildingId: String
+    let timestamp: String
+    let contractAddress: String
+    let owner: String
+    let metadata: NFTMetadata
+}
+
+struct NFTMetadata: Codable {
+    let name: String
+    let description: String
+    let image: String
+}
+
+struct NFTDetail {
+    let tokenId: String
+    let threadId: String
+    let buildingId: String
+    let timestamp: String
+    let contractAddress: String
+    let owner: String
+    let metadata: NFTMetadata
+}
+
+struct AllNFTsResult: Codable {
+    let success: Bool
+    let nfts: [UserNFT]
+    let totalCount: Int
+    let page: Int
+    let limit: Int
 }
 
 enum NFTError: Error {
