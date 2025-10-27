@@ -111,7 +111,7 @@ class NFTManager {
     
     // MARK: - Bid完成后转移NFT
     /// 在后台自动转移NFT所有权
-    func transferNFT(
+    func transferNFTForBid(
         threadId: UUID,
         from fromUsername: String,
         to toUsername: String

@@ -443,7 +443,7 @@ class BidManager {
                 Logger.success("✅ Record \(bid.recordId) now belongs to '\(bid.bidderUsername)'")
                 
                 // 🎨 自动转移NFT所有权（后台异步，用户无感）
-                await NFTManager.shared.transferNFT(
+                await NFTManager.shared.transferNFTForBid(
                     threadId: bid.recordId,
                     from: bid.ownerUsername,
                     to: bid.bidderUsername
