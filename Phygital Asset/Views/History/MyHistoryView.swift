@@ -16,6 +16,22 @@ struct MyHistoryView: View {
     @State private var ovalCheckIns: [OvalOfficeCheckIn] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
+    @State private var selectedTab: HistoryTab = .threads
+    @State private var showNFTTransfer = false
+    @State private var showNFTTransferHistory = false
+    @State private var selectedNFT: NFTInfo?
+    
+    enum HistoryTab: String, CaseIterable {
+        case threads = "Threads"
+        case nfts = "NFTs"
+        
+        var icon: String {
+            switch self {
+            case .threads: return "clock.arrow.circlepath"
+            case .nfts: return "photo"
+            }
+        }
+    }
     
     var body: some View {
         ZStack {
@@ -65,8 +81,65 @@ struct MyHistoryView: View {
                 Divider()
                     .padding(.horizontal, 20)
                 
-                // 历史记录列表
-                ScrollView {
+                // 标签页选择器
+                HStack(spacing: 0) {
+                    ForEach(HistoryTab.allCases, id: \.self) { tab in
+                        Button(action: {
+                            selectedTab = tab
+                        }) {
+                            HStack(spacing: 8) {
+                                Image(systemName: tab.icon)
+                                    .font(.system(size: 16))
+                                Text(tab.rawValue)
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                            }
+                            .foregroundColor(selectedTab == tab ? appGreen : .secondary)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
+                            .background(
+                                selectedTab == tab ? 
+                                appGreen.opacity(0.1) : Color.clear
+                            )
+                            .cornerRadius(8)
+                        }
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+                
+                Divider()
+                    .padding(.horizontal, 20)
+                
+                // 内容区域
+                if selectedTab == .threads {
+                    threadsContent
+                } else {
+                    nftsContent
+                }
+            }
+            .background(Color(.systemBackground))
+            .cornerRadius(16)
+            .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 5)
+            .padding(.horizontal, 20)
+            .frame(maxHeight: 700)
+        }
+        .onAppear {
+            loadMyHistory()
+        }
+        .sheet(isPresented: $showNFTTransfer) {
+            if let nft = selectedNFT {
+                NFTTransferView(nft: nft)
+            }
+        }
+        .sheet(isPresented: $showNFTTransferHistory) {
+            NFTTransferHistoryView()
+        }
+    }
+    
+    // MARK: - Threads内容
+    private var threadsContent: some View {
+        ScrollView {
                     LazyVStack(spacing: 16) {
                         if isLoading {
                             ProgressView()
@@ -140,15 +213,72 @@ struct MyHistoryView: View {
                     }
                     .padding(.bottom, 20)
                 }
-            }
-            .background(Color(.systemBackground))
-            .cornerRadius(16)
-            .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 5)
-            .padding(.horizontal, 20)
-            .frame(maxHeight: 700)
         }
-        .onAppear {
-            loadMyHistory()
+    }
+    
+    // MARK: - NFTs内容
+    private var nftsContent: some View {
+        VStack(spacing: 16) {
+            // NFT操作按钮
+            HStack(spacing: 12) {
+                Button(action: {
+                    showNFTTransferHistory = true
+                }) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "arrow.right.arrow.left")
+                        Text("Transfer History")
+                    }
+                    .font(.subheadline)
+                    .foregroundColor(appGreen)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(appGreen.opacity(0.1))
+                    .cornerRadius(8)
+                }
+                
+                Spacer()
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 16)
+            
+            // NFT列表
+            ScrollView {
+                LazyVGrid(columns: [
+                    GridItem(.flexible()),
+                    GridItem(.flexible())
+                ], spacing: 16) {
+                    // 模拟NFT数据
+                    ForEach(0..<4, id: \.self) { index in
+                        NFTCardView(nft: NFTInfo(
+                            threadId: UUID(),
+                            tokenId: "NFT-\(index + 1)",
+                            contractAddress: "0xA0fA27fC547D544528e9BE0cb6569E9B925e533E",
+                            buildingId: "Building \(index + 1)",
+                            timestamp: "2025-10-27T15:00:00.000Z"
+                        ))
+                        .onTapGesture {
+                            selectedNFT = NFTInfo(
+                                threadId: UUID(),
+                                tokenId: "NFT-\(index + 1)",
+                                contractAddress: "0xA0fA27fC547D544528e9BE0cb6569E9B925e533E",
+                                buildingId: "Building \(index + 1)",
+                                timestamp: "2025-10-27T15:00:00.000Z"
+                            )
+                            showNFTTransfer = true
+                        }
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 20)
+            }
+        }
+        .sheet(isPresented: $showNFTTransfer) {
+            if let nft = selectedNFT {
+                NFTTransferView(nft: nft)
+            }
+        }
+        .sheet(isPresented: $showNFTTransferHistory) {
+            NFTTransferHistoryView()
         }
     }
     

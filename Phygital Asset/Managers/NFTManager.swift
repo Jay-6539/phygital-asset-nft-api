@@ -134,10 +134,64 @@ class NFTManager {
                 Logger.success("✅ NFT转移成功（应用层）")
                 Logger.debug("   Token ID: \(result.tokenId)")
                 
+                // 发送转移成功通知
+                await MainActor.run {
+                    NotificationCenter.default.post(
+                        name: .nftTransferred,
+                        object: nil,
+                        userInfo: [
+                            "threadId": threadId,
+                            "fromUsername": fromUsername,
+                            "toUsername": toUsername,
+                            "tokenId": result.tokenId
+                        ]
+                    )
+                }
+                
             } catch {
                 Logger.debug("🔇 NFT转移失败（后台），用户无感: \(error.localizedDescription)")
             }
         }
+    }
+    
+    // MARK: - 手动转移NFT（用户主动转移）
+    /// 用户主动转移NFT给其他用户
+    func transferNFT(
+        threadId: UUID,
+        from fromUsername: String,
+        to toUsername: String
+    ) async throws -> NFTTransferResult {
+        guard isNFTEnabled else {
+            throw NFTError.serverError
+        }
+        
+        Logger.debug("🔄 开始手动转移NFT: \(threadId)")
+        Logger.debug("   \(fromUsername) → \(toUsername)")
+        
+        let result = try await callTransferAPI(
+            threadId: threadId,
+            from: fromUsername,
+            to: toUsername
+        )
+        
+        Logger.success("✅ NFT手动转移成功")
+        Logger.debug("   Token ID: \(result.tokenId)")
+        
+        // 发送转移成功通知
+        await MainActor.run {
+            NotificationCenter.default.post(
+                name: .nftTransferred,
+                object: nil,
+                userInfo: [
+                    "threadId": threadId,
+                    "fromUsername": fromUsername,
+                    "toUsername": toUsername,
+                    "tokenId": result.tokenId
+                ]
+            )
+        }
+        
+        return result
     }
     
     // MARK: - 查询NFT信息（用户可选查看）

@@ -60,10 +60,66 @@ app.post('/api/transfer-nft', async (req, res) => {
         // 模拟NFT转移过程
         const tokenId = `NFT-${Date.now()}`;
         
+        // 记录转移历史（模拟）
+        const transferRecord = {
+            id: `transfer-${Date.now()}`,
+            tokenId: tokenId,
+            threadId: threadId,
+            fromUsername: fromUsername,
+            toUsername: toUsername,
+            timestamp: new Date().toISOString(),
+            status: 'completed'
+        };
+        
         res.json({
             success: true,
             tokenId: tokenId,
-            message: `NFT transferred from ${fromUsername} to ${toUsername}`
+            message: `NFT transferred from ${fromUsername} to ${toUsername}`,
+            transferRecord: transferRecord
+        });
+        
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+// 获取转移历史端点
+app.get('/api/transfer-history/:username', async (req, res) => {
+    try {
+        const { username } = req.params;
+        
+        // 模拟转移历史数据
+        const transferHistory = [
+            {
+                id: `transfer-${Date.now()}-1`,
+                tokenId: `NFT-${Date.now()}-1`,
+                threadId: 'thread-1',
+                fromUsername: 'user1',
+                toUsername: username,
+                timestamp: new Date(Date.now() - 86400000).toISOString(), // 1天前
+                status: 'completed',
+                message: 'Thanks for the NFT!'
+            },
+            {
+                id: `transfer-${Date.now()}-2`,
+                tokenId: `NFT-${Date.now()}-2`,
+                threadId: 'thread-2',
+                fromUsername: username,
+                toUsername: 'user2',
+                timestamp: new Date(Date.now() - 172800000).toISOString(), // 2天前
+                status: 'completed',
+                message: null
+            }
+        ];
+        
+        res.json({
+            success: true,
+            username: username,
+            transfers: transferHistory,
+            totalCount: transferHistory.length
         });
         
     } catch (error) {
@@ -203,7 +259,8 @@ app.get('/', (req, res) => {
             contract: 'GET /api/contract-info',
             userNFTs: 'GET /api/user-nfts/:username',
             nftDetail: 'GET /api/nft/:tokenId',
-            allNFTs: 'GET /api/all-nfts'
+            allNFTs: 'GET /api/all-nfts',
+            transferHistory: 'GET /api/transfer-history/:username'
         },
         contractAddress: '0xA0fA27fC547D544528e9BE0cb6569E9B925e533E',
         network: 'Amoy Testnet'
