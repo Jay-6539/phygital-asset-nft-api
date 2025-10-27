@@ -5,7 +5,9 @@
   "main": "nft-api-server-amoy.js",
   "scripts": {
     "start": "node nft-api-server-amoy.js",
-    "dev": "nodemon nft-api-server-amoy.js"
+    "dev": "nodemon nft-api-server-amoy.js",
+    "build": "echo 'No build step required'",
+    "postinstall": "echo 'Dependencies installed successfully'"
   },
   "dependencies": {
     "express": "^4.18.2",
