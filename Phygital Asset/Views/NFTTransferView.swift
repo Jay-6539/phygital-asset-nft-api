@@ -13,7 +13,7 @@ struct NFTTransferView: View {
     @State private var transferMessage = ""
     @State private var isTransferring = false
     @State private var showConfirmation = false
-    @State private var transferResult: TransferResult?
+    @State private var transferResult: NFTTransferResult?
     @State private var errorMessage: String?
     
     @Environment(\.dismiss) private var dismiss
@@ -132,7 +132,7 @@ struct NFTTransferView: View {
                 )
                 
                 await MainActor.run {
-                    self.transferResult = TransferResult(
+                    self.transferResult = NFTTransferResult(
                         success: result.success,
                         message: result.message ?? "Transfer completed"
                     )
@@ -149,7 +149,7 @@ struct NFTTransferView: View {
     }
 }
 
-struct TransferResult {
+struct NFTTransferResult {
     let success: Bool
     let message: String
 }

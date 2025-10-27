@@ -361,4 +361,3 @@ struct MyHistoryView: View {
         decoder.dateDecodingStrategy = .iso8601
         return try decoder.decode([OvalOfficeCheckIn].self, from: data)
     }
-}

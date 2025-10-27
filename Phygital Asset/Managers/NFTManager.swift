@@ -589,12 +589,6 @@ struct NFTDetailData: Codable {
     let metadata: NFTMetadata
 }
 
-struct NFTMetadata: Codable {
-    let name: String
-    let description: String
-    let image: String
-}
-
 struct NFTDetail {
     let tokenId: String
     let threadId: String

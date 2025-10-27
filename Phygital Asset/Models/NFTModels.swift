@@ -32,6 +32,34 @@ struct NFTOwnershipRecord: Codable {
         case transactionHash = "transaction_hash"
         case metadata
     }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        threadId = try container.decode(UUID.self, forKey: .threadId)
+        tokenId = try container.decode(String.self, forKey: .tokenId)
+        contractAddress = try container.decode(String.self, forKey: .contractAddress)
+        currentOwnerUserId = try container.decode(UUID.self, forKey: .currentOwnerUserId)
+        originalMinterUserId = try container.decode(UUID.self, forKey: .originalMinterUserId)
+        mintedAt = try container.decode(Date.self, forKey: .mintedAt)
+        lastTransferredAt = try container.decodeIfPresent(Date.self, forKey: .lastTransferredAt)
+        transactionHash = try container.decodeIfPresent(String.self, forKey: .transactionHash)
+        metadata = try container.decodeIfPresent(NFTMetadata.self, forKey: .metadata)
+    }
+    
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(threadId, forKey: .threadId)
+        try container.encode(tokenId, forKey: .tokenId)
+        try container.encode(contractAddress, forKey: .contractAddress)
+        try container.encode(currentOwnerUserId, forKey: .currentOwnerUserId)
+        try container.encode(originalMinterUserId, forKey: .originalMinterUserId)
+        try container.encode(mintedAt, forKey: .mintedAt)
+        try container.encodeIfPresent(lastTransferredAt, forKey: .lastTransferredAt)
+        try container.encodeIfPresent(transactionHash, forKey: .transactionHash)
+        try container.encodeIfPresent(metadata, forKey: .metadata)
+    }
 }
 
 // MARK: - NFT元数据
