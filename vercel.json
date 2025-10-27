@@ -2,19 +2,20 @@
   "version": 2,
   "builds": [
     {
-      "src": "nft-api-server-amoy.js",
+      "src": "nft-api-server-simple.js",
       "use": "@vercel/node"
     }
   ],
   "routes": [
     {
       "src": "/(.*)",
-      "dest": "nft-api-server-amoy.js"
+      "dest": "nft-api-server-simple.js"
     }
   ],
   "env": {
     "AMOY_RPC_URL": "https://rpc-amoy.polygon.technology/",
     "AMOY_CHAIN_ID": "80002",
-    "CONTRACT_ADDRESS": "0xA0fA27fC547D544528e9BE0cb6569E9B925e533E"
+    "CONTRACT_ADDRESS": "0xA0fA27fC547D544528e9BE0cb6569E9B925e533E",
+    "NODE_ENV": "production"
   }
 }
