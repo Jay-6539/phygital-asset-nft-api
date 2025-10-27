@@ -244,7 +244,7 @@ COMMENT ON COLUMN bids.record_id IS 'check-in记录ID';
 COMMENT ON COLUMN bids.record_type IS '记录类型: building 或 oval_office';
 COMMENT ON COLUMN bids.bidder_username IS '出价者用户名';
 COMMENT ON COLUMN bids.owner_username IS '记录拥有者用户名';
-COMMENT ON COLUMN bids.bid_amount IS '出价金额（credits）';
+COMMENT ON COLUMN bids.bid_amount IS '出价金额（echo）';
 COMMENT ON COLUMN bids.counter_amount IS '卖家反价金额';
 COMMENT ON COLUMN bids.status IS '状态: pending/countered/accepted/completed/rejected/cancelled/expired';
 

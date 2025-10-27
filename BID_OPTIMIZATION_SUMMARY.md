@@ -295,7 +295,7 @@ Counter输入: 600, 有留言 → ✅ 可发送
 
 **P2级别（体验优化）**：
 
-1. **Credits余额检查** 💳
+1. **Echos余额检查** 💳
    - 出价前检查余额
    - 显示"Available: XXX credits"
 

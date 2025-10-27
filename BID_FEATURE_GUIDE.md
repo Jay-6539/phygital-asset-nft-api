@@ -136,7 +136,7 @@ MarketView.swift
 
 ### 1. BidInputView（出价界面）
 - ✅ 大号数字输入框
-- ✅ Credits图标和文字
+- ✅ Echos图标和文字
 - ✅ 可选留言文本框
 - ✅ 信息提示（绿色背景）
 - ✅ 禁用逻辑和验证
@@ -315,7 +315,7 @@ SELECT * FROM get_my_received_bids('your_username');
 
 **预期**:
 - 显示账号A的出价
-- 金额: 500 Credits
+- 金额: 500 Echos
 - 留言: "I want this!"
 - 时间: "刚刚"
 
@@ -323,7 +323,7 @@ SELECT * FROM get_my_received_bids('your_username');
 
 1. 点击Bid查看详情
 2. 点击"Counter"按钮
-3. 输入反价: 800 Credits
+3. 输入反价: 800 Echos
 4. 留言: "How about 800?"
 5. 提交
 
@@ -357,7 +357,7 @@ SELECT * FROM get_my_received_bids('your_username');
 
 **特点**:
 - 大号数字显示
-- Credits星星图标
+- Echos星星图标
 - 信息提示框
 
 ---
@@ -472,8 +472,8 @@ pending (等待卖家)
 4. ⏳ 已完成交易的评价系统
 
 ### 中期
-1. ⏳ Credits钱包系统
-2. ⏳ 自动扣除/转账Credits
+1. ⏳ Echos钱包系统
+2. ⏳ 自动扣除/转账Echos
 3. ⏳ 交易记录存档
 4. ⏳ 黑名单功能
 

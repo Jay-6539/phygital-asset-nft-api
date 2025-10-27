@@ -18,10 +18,10 @@ echo "📡 Supabase URL: $SUPABASE_URL"
 echo "🔑 API Key: ${SUPABASE_ANON_KEY:0:20}..."
 echo ""
 
-# 测试1: 查询asset_checkins记录数
-echo "📊 Test 1: Checking asset_checkins table..."
+# 测试1: 查询threads记录数
+echo "📊 Test 1: Checking threads table..."
 response=$(curl -s \
-  "${SUPABASE_URL}/rest/v1/asset_checkins?select=building_id,username&limit=5" \
+  "${SUPABASE_URL}/rest/v1/threads?select=building_id,username&limit=5" \
   -H "apikey: ${SUPABASE_ANON_KEY}" \
   -H "Authorization: Bearer ${SUPABASE_ANON_KEY}")
 
@@ -38,18 +38,18 @@ fi
 echo ""
 echo "📊 Test 2: Counting total records..."
 total_response=$(curl -s \
-  "${SUPABASE_URL}/rest/v1/asset_checkins?select=id" \
+  "${SUPABASE_URL}/rest/v1/threads?select=id" \
   -H "apikey: ${SUPABASE_ANON_KEY}" \
   -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" \
   -H "Prefer: count=exact")
 
 total_count=$(echo "$total_response" | jq '. | length' 2>/dev/null)
-echo "Total records in asset_checkins: $total_count"
+echo "Total records in threads: $total_count"
 
 echo ""
 echo "📊 Test 3: Sample data with created_at..."
 sample_response=$(curl -s \
-  "${SUPABASE_URL}/rest/v1/asset_checkins?select=building_id,username,created_at&limit=3" \
+  "${SUPABASE_URL}/rest/v1/threads?select=building_id,username,created_at&limit=3" \
   -H "apikey: ${SUPABASE_ANON_KEY}" \
   -H "Authorization: Bearer ${SUPABASE_ANON_KEY}")
 

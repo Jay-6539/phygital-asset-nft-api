@@ -9,7 +9,7 @@ echo ""
 
 echo "📖 测试读取"
 curl -s -X GET \
-  "${SUPABASE_URL}/rest/v1/oval_office_checkins?select=*&limit=5" \
+  "${SUPABASE_URL}/rest/v1/oval_office_threads?select=*&limit=5" \
   -H "apikey: ${API_KEY}" \
   -H "Authorization: Bearer ${API_KEY}" \
   -H "Accept: application/json"

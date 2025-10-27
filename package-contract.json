@@ -1,0 +1,31 @@
+{
+  "name": "phygital-asset-nft-contract",
+  "version": "1.0.0",
+  "description": "Phygital Asset NFT智能合约 - 部署到Amoy测试网",
+  "main": "index.js",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy:amoy": "hardhat run scripts/deploy.js --network amoy",
+    "deploy:local": "hardhat run scripts/deploy.js --network localhost",
+    "verify": "hardhat verify --network amoy",
+    "clean": "hardhat clean"
+  },
+  "keywords": [
+    "nft",
+    "smart-contract",
+    "polygon",
+    "amoy",
+    "phygital-asset"
+  ],
+  "author": "Jay",
+  "license": "MIT",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "@openzeppelin/contracts": "^4.9.3",
+    "hardhat": "^2.17.1"
+  },
+  "dependencies": {
+    "dotenv": "^16.3.1"
+  }
+}

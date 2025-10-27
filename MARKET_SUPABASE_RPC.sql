@@ -17,7 +17,7 @@ BEGIN
         ac.building_id,
         COUNT(*) as record_count,
         MAX(ac.created_at) as last_activity
-    FROM asset_checkins ac
+    FROM threads ac
     GROUP BY ac.building_id
     ORDER BY record_count DESC
     LIMIT record_limit;
@@ -43,7 +43,7 @@ BEGIN
     WITH all_users AS (
         -- 获取所有用户（包括没有asset的用户）
         -- 1. 所有曾经check-in的用户
-        SELECT DISTINCT ac.username FROM asset_checkins ac
+        SELECT DISTINCT ac.username FROM threads ac
         UNION
         -- 2. 所有transfer_requests中的用户（无论状态）
         SELECT DISTINCT tr.from_user AS username FROM transfer_requests tr WHERE tr.from_user IS NOT NULL
@@ -56,12 +56,12 @@ BEGIN
         SELECT DISTINCT b.owner_username AS username FROM bids b WHERE b.owner_username IS NOT NULL
         UNION
         -- 4. Oval Office用户
-        SELECT DISTINCT oc.username FROM oval_office_checkins oc WHERE oc.username IS NOT NULL
+        SELECT DISTINCT oc.username FROM oval_office_threads oc WHERE oc.username IS NOT NULL
     )
     SELECT 
         au.username,
-        COALESCE((SELECT COUNT(*) FROM asset_checkins ac WHERE ac.username = au.username), 0) as total_records,
-        COALESCE((SELECT COUNT(DISTINCT building_id) FROM asset_checkins ac WHERE ac.username = au.username), 0) as unique_buildings,
+        COALESCE((SELECT COUNT(*) FROM threads ac WHERE ac.username = au.username), 0) as total_records,
+        COALESCE((SELECT COUNT(DISTINCT building_id) FROM threads ac WHERE ac.username = au.username), 0) as unique_buildings,
         COALESCE(
             (SELECT COUNT(*) FROM transfer_requests tr WHERE tr.from_user = au.username AND tr.status = 'completed'), 0
         ) + COALESCE(
@@ -69,11 +69,11 @@ BEGIN
         ) as transfer_count,
         (
             -- Building check-ins: 10分/个
-            COALESCE((SELECT COUNT(*) FROM asset_checkins ac WHERE ac.username = au.username), 0) * 10 + 
+            COALESCE((SELECT COUNT(*) FROM threads ac WHERE ac.username = au.username), 0) * 10 + 
             -- Oval Office check-ins: 10分/个
-            COALESCE((SELECT COUNT(*) FROM oval_office_checkins oc WHERE oc.username = au.username), 0) * 10 +
+            COALESCE((SELECT COUNT(*) FROM oval_office_threads oc WHERE oc.username = au.username), 0) * 10 +
             -- 独立建筑数: 50分/个
-            COALESCE((SELECT COUNT(DISTINCT building_id) FROM asset_checkins ac WHERE ac.username = au.username), 0) * 50 +
+            COALESCE((SELECT COUNT(DISTINCT building_id) FROM threads ac WHERE ac.username = au.username), 0) * 50 +
             -- 通过transfer_requests完成的转让: 20分/次
             COALESCE((SELECT COUNT(*) FROM transfer_requests tr WHERE tr.from_user = au.username AND tr.status = 'completed'), 0) * 20 +
             -- 通过bids完成的卖出: 20分/次
@@ -92,7 +92,7 @@ $$ LANGUAGE plpgsql;
 -- 调试查询 - 查看所有用户来源:
 /*
 WITH all_users_debug AS (
-    SELECT DISTINCT username, 'asset_checkins' as source FROM asset_checkins
+    SELECT DISTINCT username, 'threads' as source FROM threads
     UNION ALL
     SELECT DISTINCT from_user AS username, 'transfer_from' as source FROM transfer_requests WHERE from_user IS NOT NULL
     UNION ALL
@@ -102,7 +102,7 @@ WITH all_users_debug AS (
     UNION ALL
     SELECT DISTINCT owner_username AS username, 'bid_seller' as source FROM bids WHERE owner_username IS NOT NULL
     UNION ALL
-    SELECT DISTINCT username, 'oval_office' as source FROM oval_office_checkins WHERE username IS NOT NULL
+    SELECT DISTINCT username, 'oval_office' as source FROM oval_office_threads WHERE username IS NOT NULL
 )
 SELECT username, STRING_AGG(DISTINCT source, ', ') as sources
 FROM all_users_debug
@@ -125,7 +125,7 @@ BEGIN
         COUNT(DISTINCT building_id) as total_buildings,
         COUNT(*) as total_records,
         COUNT(DISTINCT username) as active_users
-    FROM asset_checkins;
+    FROM threads;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -175,8 +175,8 @@ BEGIN
             ), 0
         ) as transfer_count,
         ac.created_at,
-        ac.description as notes  -- asset_checkins表中字段是description
-    FROM asset_checkins ac
+        ac.description as notes  -- threads表中字段是description
+    FROM threads ac
     WHERE ac.id::text IN (
         -- 选择有transfer_requests记录的
         SELECT DISTINCT record_id 
@@ -215,7 +215,7 @@ BEGIN
         COUNT(*) as record_count,
         MAX(oc.created_at) as last_activity,
         COUNT(DISTINCT oc.username) as unique_owners
-    FROM oval_office_checkins oc
+    FROM oval_office_threads oc
     WHERE oc.asset_name IS NOT NULL
     GROUP BY oc.asset_name
     ORDER BY record_count DESC

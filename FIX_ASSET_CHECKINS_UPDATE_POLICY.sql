@@ -1,19 +1,19 @@
 -- ============================================================================
--- 修复：为 asset_checkins 表添加 UPDATE 策略
+-- 修复：为 threads 表添加 UPDATE 策略
 -- ============================================================================
--- 问题：Bid完成后无法转移资产所有权，因为缺少UPDATE策略
+-- 问题：Bid完成后无法转移Thread所有权，因为缺少UPDATE策略
 -- 解决：添加允许更新username字段的RLS策略
 -- ============================================================================
 
 -- 1. 删除旧的UPDATE策略（如果存在）
 -- ============================================================================
-DROP POLICY IF EXISTS "Allow public update" ON asset_checkins;
-DROP POLICY IF EXISTS "Allow update for asset transfer" ON asset_checkins;
+DROP POLICY IF EXISTS "Allow public update" ON threads;
+DROP POLICY IF EXISTS "Allow update for thread transfer" ON threads;
 
 -- 2. 创建新的UPDATE策略：允许所有人更新
 -- ============================================================================
 CREATE POLICY "Allow public update"
-    ON asset_checkins
+    ON threads
     FOR UPDATE
     USING (true)
     WITH CHECK (true);
@@ -24,8 +24,8 @@ CREATE POLICY "Allow public update"
 -- 
 -- 生产环境建议：
 -- 可以限制只允许通过特定条件更新，例如：
--- CREATE POLICY "Allow update for asset transfer"
---     ON asset_checkins
+-- CREATE POLICY "Allow update for thread transfer"
+--     ON threads
 --     FOR UPDATE
 --     USING (true)  -- 允许读取任何行
 --     WITH CHECK (
@@ -33,28 +33,28 @@ CREATE POLICY "Allow public update"
 --         username IS NOT NULL
 --     );
 
--- 3. 同样为 oval_office_checkins 表添加UPDATE策略
+-- 3. 同样为 oval_office_threads 表添加UPDATE策略
 -- ============================================================================
-DROP POLICY IF EXISTS "Allow public update" ON oval_office_checkins;
+DROP POLICY IF EXISTS "Allow public update" ON oval_office_threads;
 
 CREATE POLICY "Allow public update"
-    ON oval_office_checkins
+    ON oval_office_threads
     FOR UPDATE
     USING (true)
     WITH CHECK (true);
 
 -- 4. 验证策略已创建
 -- ============================================================================
--- 查看 asset_checkins 的所有策略
+-- 查看 threads 的所有策略
 SELECT schemaname, tablename, policyname, permissive, roles, cmd, qual, with_check
 FROM pg_policies
-WHERE tablename = 'asset_checkins'
+WHERE tablename = 'threads'
 ORDER BY policyname;
 
--- 查看 oval_office_checkins 的所有策略
+-- 查看 oval_office_threads 的所有策略
 SELECT schemaname, tablename, policyname, permissive, roles, cmd, qual, with_check
 FROM pg_policies
-WHERE tablename = 'oval_office_checkins'
+WHERE tablename = 'oval_office_threads'
 ORDER BY policyname;
 
 -- ============================================================================
@@ -73,12 +73,12 @@ ORDER BY policyname;
 -- ============================================================================
 -- 执行后应该看到以下策略：
 --
--- asset_checkins:
+-- threads:
 -- - Allow public read access (SELECT)
 -- - Allow public insert (INSERT)
 -- - Allow public update (UPDATE)  ← 新增
 --
--- oval_office_checkins:
+-- oval_office_threads:
 -- - Allow public read access (SELECT)
 -- - Allow public insert (INSERT)
 -- - Allow public update (UPDATE)  ← 新增
