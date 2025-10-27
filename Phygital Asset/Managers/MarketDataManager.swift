@@ -72,8 +72,8 @@ class MarketDataManager {
             
             struct TrendingResult: Codable {
                 let building_id: String
-                let record_count: Int
-                let last_activity: String
+                let thread_count: Int
+                let latest_thread: String
             }
             
             let results = try JSONDecoder().decode([TrendingResult].self, from: data)
@@ -85,8 +85,8 @@ class MarketDataManager {
                     name: "Building \(result.building_id)",
                     district: "Unknown",
                     coordinate: CLLocationCoordinate2D(latitude: 0, longitude: 0),
-                    recordCount: result.record_count,
-                    lastActivityTime: dateFormatter.date(from: result.last_activity) ?? Date(),
+                    recordCount: result.thread_count,
+                    lastActivityTime: dateFormatter.date(from: result.latest_thread) ?? Date(),
                     rank: index + 1
                 )
             }
