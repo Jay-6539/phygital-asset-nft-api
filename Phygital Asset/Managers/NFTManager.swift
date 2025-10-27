@@ -11,15 +11,14 @@ class NFTManager {
     static let shared = NFTManager()
     private init() {}
     
-    // 生产环境API服务地址 - 连接到Amoy测试网
+    // 生产环境API服务地址 - 连接到Vercel部署
     private let apiURL: String = {
         #if DEBUG
-        // 开发环境：本地Amoy API服务
+        // 开发环境：本地API服务
         return "http://127.0.0.1:3000/api"
         #else
-        // 生产环境：云端API服务
-        // 🔄 部署完成后，请更新为您的实际部署URL
-        return "https://phygital-asset-nft-api.vercel.app/api"
+        // 生产环境：Vercel云端API服务
+        return "https://phygital-asset-nft-k0l8bbict-jay-6539s-projects.vercel.app/api"
         #endif
     }()
     
