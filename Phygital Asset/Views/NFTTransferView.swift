@@ -113,7 +113,7 @@ struct NFTTransferView: View {
                 }
             } message: {
                 if let result = transferResult {
-                    Text(result.success ? "NFT transferred successfully!" : "Transfer failed: \(result.message)")
+                    Text(result.success ? "NFT transferred successfully!" : "Transfer failed: \(result.message ?? "Unknown error")")
                 }
             }
         }
