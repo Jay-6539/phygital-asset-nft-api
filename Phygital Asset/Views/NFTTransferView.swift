@@ -134,6 +134,7 @@ struct NFTTransferView: View {
                 await MainActor.run {
                     self.transferResult = NFTTransferResult(
                         success: result.success,
+                        tokenId: result.tokenId,
                         message: result.message ?? "Transfer completed"
                     )
                     self.isTransferring = false
@@ -147,11 +148,6 @@ struct NFTTransferView: View {
             }
         }
     }
-}
-
-struct NFTTransferResult {
-    let success: Bool
-    let message: String
 }
 
 struct NFTTransferConfirmationView: View {
