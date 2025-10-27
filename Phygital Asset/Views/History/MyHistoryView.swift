@@ -272,14 +272,6 @@ struct MyHistoryView: View {
                 .padding(.bottom, 20)
             }
         }
-        .sheet(isPresented: $showNFTTransfer) {
-            if let nft = selectedNFT {
-                NFTTransferView(nft: nft)
-            }
-        }
-        .sheet(isPresented: $showNFTTransferHistory) {
-            NFTTransferHistoryView()
-        }
     }
     
     private func loadMyHistory() {
