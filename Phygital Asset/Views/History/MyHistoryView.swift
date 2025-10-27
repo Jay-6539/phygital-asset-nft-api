@@ -140,79 +140,78 @@ struct MyHistoryView: View {
     // MARK: - Threads内容
     private var threadsContent: some View {
         ScrollView {
-                    LazyVStack(spacing: 16) {
-                        if isLoading {
-                            ProgressView()
-                                .padding(.vertical, 40)
-                        } else if let error = errorMessage {
-                            VStack(spacing: 12) {
-                                Image(systemName: "exclamationmark.triangle")
-                                    .font(.system(size: 50))
-                                    .foregroundColor(appGreen.opacity(0.5))
-                                Text("Failed to load history")
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                                Text(error)
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                
-                                Button("Retry") {
-                                    loadMyHistory()
-                                }
-                                .foregroundColor(appGreen)
-                            }
-                            .padding(.vertical, 40)
-                        } else if myCheckIns.isEmpty && ovalCheckIns.isEmpty {
-                            VStack(spacing: 12) {
-                                Image(systemName: "clock.arrow.circlepath")
-                                    .font(.system(size: 50))
-                                    .foregroundColor(.gray.opacity(0.5))
-                                Text("No thread history yet")
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                                Text("Start creating threads to see your history!")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            .padding(.vertical, 40)
-                        } else {
-                            // 显示历史建筑Check-ins
-                            if !myCheckIns.isEmpty {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    Text("Historic Buildings (\(myCheckIns.count))")
-                                        .font(.subheadline)
-                                        .fontWeight(.semibold)
-                                        .foregroundColor(.secondary)
-                                        .padding(.horizontal, 20)
-                                    
-                                    ForEach(myCheckIns) { checkIn in
-                                        BuildingCheckInRow(checkIn: checkIn)
-                                            .padding(.horizontal, 20)
-                                    }
-                                }
-                                .padding(.top, 16)
-                            }
+            LazyVStack(spacing: 16) {
+                if isLoading {
+                    ProgressView()
+                        .padding(.vertical, 40)
+                } else if let error = errorMessage {
+                    VStack(spacing: 12) {
+                        Image(systemName: "exclamationmark.triangle")
+                            .font(.system(size: 50))
+                            .foregroundColor(appGreen.opacity(0.5))
+                        Text("Failed to load history")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        Text(error)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        
+                        Button("Retry") {
+                            loadMyHistory()
+                        }
+                        .foregroundColor(appGreen)
+                    }
+                    .padding(.vertical, 40)
+                } else if myCheckIns.isEmpty && ovalCheckIns.isEmpty {
+                    VStack(spacing: 12) {
+                        Image(systemName: "clock.arrow.circlepath")
+                            .font(.system(size: 50))
+                            .foregroundColor(.gray.opacity(0.5))
+                        Text("No thread history yet")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        Text("Start creating threads to see your history!")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.vertical, 40)
+                } else {
+                    // 显示历史建筑Check-ins
+                    if !myCheckIns.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Historic Buildings (\(myCheckIns.count))")
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.secondary)
+                                .padding(.horizontal, 20)
                             
-                            // 显示Oval Office Check-ins
-                            if !ovalCheckIns.isEmpty {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    Text("Oval Office (\(ovalCheckIns.count))")
-                                        .font(.subheadline)
-                                        .fontWeight(.semibold)
-                                        .foregroundColor(.secondary)
-                                        .padding(.horizontal, 20)
-                                    
-                                    ForEach(ovalCheckIns) { checkIn in
-                                        OvalOfficeCheckInRow(checkIn: checkIn, appGreen: appGreen)
-                                            .padding(.horizontal, 20)
-                                    }
-                                }
-                                .padding(.top, 16)
+                            ForEach(myCheckIns) { checkIn in
+                                BuildingCheckInRow(checkIn: checkIn)
+                                    .padding(.horizontal, 20)
                             }
                         }
+                        .padding(.top, 16)
                     }
-                    .padding(.bottom, 20)
+                    
+                    // 显示Oval Office Check-ins
+                    if !ovalCheckIns.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Oval Office (\(ovalCheckIns.count))")
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.secondary)
+                                .padding(.horizontal, 20)
+                            
+                            ForEach(ovalCheckIns) { checkIn in
+                                OvalOfficeCheckInRow(checkIn: checkIn, appGreen: appGreen)
+                                    .padding(.horizontal, 20)
+                            }
+                        }
+                        .padding(.top, 16)
+                    }
                 }
+            }
+            .padding(.bottom, 20)
         }
     }
     
@@ -305,18 +304,12 @@ struct MyHistoryView: View {
     }
     
     private func loadBuildingCheckIns() async throws -> [BuildingCheckIn] {
-        let baseURL = SupabaseConfig.url
-        let apiKey = SupabaseConfig.anonKey
-        
-        guard let url = URL(string: "\(baseURL)/rest/v1/threads?username=eq.\(username)&order=created_at.desc") else {
-            throw NSError(domain: "InvalidURL", code: -1)
-        }
+        let endpoint = "building_checkins?username=eq.\(username)&select=*&order=created_at.desc"
+        let url = URL(string: "\(SupabaseConfig.url)/rest/v1/\(endpoint)")!
         
         var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue(apiKey, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue(SupabaseConfig.anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(SupabaseConfig.anonKey)", forHTTPHeaderField: "Authorization")
         
         let (data, response) = try await URLSession.shared.data(for: request)
         
@@ -330,18 +323,12 @@ struct MyHistoryView: View {
     }
     
     private func loadOvalOfficeCheckIns() async throws -> [OvalOfficeCheckIn] {
-        let baseURL = SupabaseConfig.url
-        let apiKey = SupabaseConfig.anonKey
-        
-        guard let url = URL(string: "\(baseURL)/rest/v1/oval_office_threads?username=eq.\(username)&order=created_at.desc") else {
-            throw NSError(domain: "InvalidURL", code: -1)
-        }
+        let endpoint = "oval_office_checkins?username=eq.\(username)&select=*&order=created_at.desc"
+        let url = URL(string: "\(SupabaseConfig.url)/rest/v1/\(endpoint)")!
         
         var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue(apiKey, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue(SupabaseConfig.anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(SupabaseConfig.anonKey)", forHTTPHeaderField: "Authorization")
         
         let (data, response) = try await URLSession.shared.data(for: request)
         
@@ -353,3 +340,4 @@ struct MyHistoryView: View {
         decoder.dateDecodingStrategy = .iso8601
         return try decoder.decode([OvalOfficeCheckIn].self, from: data)
     }
+}
